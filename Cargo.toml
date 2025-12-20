@@ -1,0 +1,14 @@
+[package]
+name = "lean-multisig-py"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "lean_multisig"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }
+lean-multisig = { git = "https://github.com/anshalshukla/leanMultisig", branch = "devnet2" }
+bincode = "1.3.3"
+serde = { version = "1.0.228", features = ["derive"] }
