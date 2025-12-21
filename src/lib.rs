@@ -1,7 +1,7 @@
 use ::lean_multisig::{
     xmss_aggregate_signatures, xmss_aggregation_setup_prover, xmss_aggregation_setup_verifier,
-    xmss_verify_aggregated_signatures, Devnet2XmssAggregateSignature, LeanSigPubKey,
-    LeanSigSignature, XmssAggregateError,
+    xmss_verify_aggregated_signatures, XmssPublicKey, XmssSignature, F,
+    PrimeCharacteristicRing,
 };
 
 use pyo3::exceptions::PyValueError;
@@ -26,8 +26,9 @@ fn setup_verifier() {
 /// Args:
 ///     pub_keys_bytes: List of serialized public keys (each as bytes)
 ///     signatures_bytes: List of serialized signatures (each as bytes)
-///     message_hash: 32-byte message hash
-///     epoch: Epoch number
+///     message_hash: List of 8 field elements (u64 values)
+///     slot: Slot number
+///     test_mode: If True, returns a dummy signature without actual aggregation
 ///
 /// Returns:
 ///     Serialized aggregated signature as bytes
@@ -38,8 +39,8 @@ fn setup_verifier() {
 fn aggregate_signatures(
     pub_keys_bytes: Vec<Vec<u8>>,
     signatures_bytes: Vec<Vec<u8>>,
-    message_hash: Vec<u8>,
-    epoch: u32,
+    message_hash: Vec<u64>,
+    slot: u64,
     test_mode: bool,
 ) -> PyResult<Vec<u8>> {
     if test_mode {
@@ -47,9 +48,9 @@ fn aggregate_signatures(
     }
 
     // Validate message hash length
-    if message_hash.len() != 32 {
+    if message_hash.len() != 8 {
         return Err(PyValueError::new_err(
-            "message_hash must be exactly 32 bytes",
+            "message_hash must be exactly 8 field elements",
         ));
     }
 
@@ -63,7 +64,7 @@ fn aggregate_signatures(
     }
 
     // Deserialize public keys
-    let pub_keys: Result<Vec<LeanSigPubKey>, _> = pub_keys_bytes
+    let pub_keys: Result<Vec<XmssPublicKey>, _> = pub_keys_bytes
         .iter()
         .map(|bytes| bincode::deserialize(bytes))
         .collect();
@@ -71,41 +72,36 @@ fn aggregate_signatures(
         .map_err(|e| PyValueError::new_err(format!("Failed to deserialize public key: {}", e)))?;
 
     // Deserialize signatures
-    let signatures: Result<Vec<LeanSigSignature>, _> = signatures_bytes
+    let signatures: Result<Vec<XmssSignature>, _> = signatures_bytes
         .iter()
         .map(|bytes| bincode::deserialize(bytes))
         .collect();
     let signatures = signatures
         .map_err(|e| PyValueError::new_err(format!("Failed to deserialize signature: {}", e)))?;
 
-    // Convert message_hash to array
-    let mut message_array = [0u8; 32];
-    message_array.copy_from_slice(&message_hash);
+    // Convert message_hash to field element array
+    let message_array: [F; 8] = message_hash
+        .iter()
+        .map(|&v| F::from_u64(v))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 
     // Call the aggregation function
-    let agg_sig = xmss_aggregate_signatures(&pub_keys, &signatures, &message_array, epoch)
-        .map_err(|e| match e {
-            XmssAggregateError::WrongSignatureCount => {
-                PyValueError::new_err("Wrong signature count")
-            }
-            XmssAggregateError::InvalidSigature => PyValueError::new_err("Invalid signature"),
-        })?;
+    let agg_sig = xmss_aggregate_signatures(&pub_keys, &signatures, message_array, slot)
+        .map_err(|e| PyValueError::new_err(format!("Aggregation failed: {:?}", e)))?;
 
-    // Serialize the aggregated signature
-    let serialized = bincode::serialize(&agg_sig).map_err(|e| {
-        PyValueError::new_err(format!("Failed to serialize aggregated signature: {}", e))
-    })?;
-
-    Ok(serialized)
+    Ok(agg_sig)
 }
 
 /// Verify aggregated XMSS signatures.
 ///
 /// Args:
 ///     pub_keys_bytes: List of serialized public keys (each as bytes)
-///     message_hash: 32-byte message hash
+///     message_hash: List of 8 field elements (u64 values)
 ///     agg_signature_bytes: Serialized aggregated signature as bytes
-///     epoch: Epoch number
+///     slot: Slot number
+///     test_mode: If True, skips actual verification
 ///
 /// Returns:
 ///     None if verification succeeds
@@ -115,9 +111,9 @@ fn aggregate_signatures(
 #[pyfunction]
 fn verify_aggregated_signatures(
     pub_keys_bytes: Vec<Vec<u8>>,
-    message_hash: Vec<u8>,
+    message_hash: Vec<u64>,
     agg_signature_bytes: Vec<u8>,
-    epoch: u32,
+    slot: u64,
     test_mode: bool,
 ) -> PyResult<()> {
     if test_mode {
@@ -125,32 +121,30 @@ fn verify_aggregated_signatures(
     }
 
     // Validate message hash length
-    if message_hash.len() != 32 {
+    if message_hash.len() != 8 {
         return Err(PyValueError::new_err(
-            "message_hash must be exactly 32 bytes",
+            "message_hash must be exactly 8 field elements",
         ));
     }
 
     // Deserialize public keys
-    let pub_keys: Result<Vec<LeanSigPubKey>, _> = pub_keys_bytes
+    let pub_keys: Result<Vec<XmssPublicKey>, _> = pub_keys_bytes
         .iter()
         .map(|bytes| bincode::deserialize(bytes))
         .collect();
     let pub_keys = pub_keys
         .map_err(|e| PyValueError::new_err(format!("Failed to deserialize public key: {}", e)))?;
 
-    // Deserialize aggregated signature
-    let agg_sig: Devnet2XmssAggregateSignature = bincode::deserialize(&agg_signature_bytes)
-        .map_err(|e| {
-            PyValueError::new_err(format!("Failed to deserialize aggregated signature: {}", e))
-        })?;
-
-    // Convert message_hash to array
-    let mut message_array = [0u8; 32];
-    message_array.copy_from_slice(&message_hash);
+    // Convert message_hash to field element array
+    let message_array: [F; 8] = message_hash
+        .iter()
+        .map(|&v| F::from_u64(v))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 
     // Call the verification function
-    xmss_verify_aggregated_signatures(&pub_keys, &message_array, &agg_sig, epoch)
+    xmss_verify_aggregated_signatures(&pub_keys, message_array, &agg_signature_bytes, slot)
         .map_err(|e| PyValueError::new_err(format!("Verification failed: {:?}", e)))?;
 
     Ok(())

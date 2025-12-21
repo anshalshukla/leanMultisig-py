@@ -1,0 +1,7 @@
+[target.'cfg(target_os = "macos")']
+# When building a CPython extension module on macOS, Python symbols are resolved
+# by the interpreter at load time. This tells the linker to allow unresolved
+# symbols (e.g. _PyBool_Type) during link.
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+
+
