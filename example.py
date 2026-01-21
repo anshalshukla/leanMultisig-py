@@ -20,10 +20,10 @@ def example_usage():
     # Optional: Setup prover and verifier for better performance
     # Call these once at startup to precompute DFT twiddles
     print("Setting up prover...")
-    lean_multisig_py.setup_prover()
+    lean_multisig_py.setup_prover(mode="prod")
 
     print("Setting up verifier...")
-    lean_multisig_py.setup_verifier()
+    lean_multisig_py.setup_verifier(mode="prod")
 
     # TODO: Replace this with your actual signature generation from leanSpec
     # You need to:
@@ -51,7 +51,8 @@ To use this with your actual signatures:
        pub_keys_bytes,  # List[bytes]
        signatures_bytes,  # List[bytes]
        message_hash,  # bytes (32 bytes)
-       epoch  # int
+       epoch,  # int
+       mode="prod",  # or "test"/test_mode=True
    )
 
 4. Call verify_aggregated_signatures:
@@ -59,7 +60,8 @@ To use this with your actual signatures:
        pub_keys_bytes,  # List[bytes]
        message_hash,  # bytes (32 bytes)
        agg_sig_bytes,  # bytes
-       epoch  # int
+       epoch,  # int
+       mode="prod",
    )
    # Raises ValueError if verification fails
 """)

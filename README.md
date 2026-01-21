@@ -21,14 +21,19 @@ Python bindings for XMSS signature aggregation from the lean-multisig project.
 
 ```bash
 # From the leanMultisig-py directory
-maturin develop --release
+pip install -e .
+# (Runs release-mode Rust builds for both prod & test modules automatically)
 ```
 
-For production builds:
+For production wheels (e.g., to publish or install elsewhere):
 ```bash
-maturin build --release
-pip install target/wheels/lean_multisig_py-*.whl
+pip wheel .
+pip install lean_multisig_py-*.whl
 ```
+
+If you just want to refresh the native libraries in-place without installing,
+run `python build_native.py` (or `./build_all.sh` which wraps the same logic and
+performs an editable install).
 
 ## Usage
 
@@ -38,8 +43,8 @@ pip install target/wheels/lean_multisig_py-*.whl
 import lean_multisig_py
 
 # Optional: Setup for better performance (call once at startup)
-lean_multisig_py.setup_prover()
-lean_multisig_py.setup_verifier()
+lean_multisig_py.setup_prover(mode="prod")     # or test_mode=True for the test config
+lean_multisig_py.setup_verifier(mode="prod")
 
 # Your serialized data (from leanSpec or other source)
 pub_keys_bytes = [...]  # List of serialized public keys (bytes)
@@ -47,12 +52,13 @@ signatures_bytes = [...]  # List of serialized signatures (bytes)
 message_hash = b'...'  # 32-byte message hash
 epoch = 50
 
-# Aggregate signatures
+# Aggregate signatures (pick "prod" or "test")
 agg_sig_bytes = lean_multisig_py.aggregate_signatures(
     pub_keys_bytes,
     signatures_bytes,
     message_hash,
-    epoch
+    epoch,
+    mode="prod",  # omit or set to "test" for the fast devnet config
 )
 
 # Verify aggregated signature
@@ -61,12 +67,25 @@ try:
         pub_keys_bytes,
         message_hash,
         agg_sig_bytes,
-        epoch
+        epoch,
+        mode="prod",
     )
     print("Verification successful!")
 except ValueError as e:
     print(f"Verification failed: {e}")
 ```
+
+### Selecting prod vs. test parameters
+
+Two Rust extension modules ship in the wheel:
+
+- `lean_multisig_py.prod` – production security parameters
+- `lean_multisig_py.test` – fast parameters useful for development
+
+You can either import the modules directly or use the convenience wrappers shown above.
+Pass `mode="prod"`/`"test"` (or the legacy `test_mode=True/False` flag used by
+`leanSpec`) to choose the config at runtime. Without an explicit flag the test module
+is used when available, matching the previous default behavior.
 
 ## Data Format
 
