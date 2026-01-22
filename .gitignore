@@ -5,7 +5,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
+# Exclude .so files except in the package directory
 *.so
+!lean_multisig_py/*.so
 .Python
 build/
 develop-eggs/
