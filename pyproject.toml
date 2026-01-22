@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel", "maturin>=1.5.1"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,3 +11,10 @@ classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lean_multisig_py*"]
+
+[tool.setuptools.package-data]
+lean_multisig_py = ["*.so", "*.pyd"]

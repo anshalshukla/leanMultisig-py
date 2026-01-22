@@ -1,7 +1,7 @@
 use lean_multisig::{
-    Devnet2XmssAggregateSignature, config::LeanSigPubKey, config::LeanSigSignature,
-    xmss_aggregate_signatures, xmss_aggregation_setup_prover, xmss_aggregation_setup_verifier,
-    xmss_verify_aggregated_signatures,
+    config::LeanSigPubKey, config::LeanSigSignature, xmss_aggregate_signatures,
+    xmss_aggregation_setup_prover, xmss_aggregation_setup_verifier,
+    xmss_verify_aggregated_signatures, Devnet2XmssAggregateSignature,
 };
 use ssz::{Decode, Encode};
 
@@ -71,16 +71,18 @@ fn aggregate_signatures(
         .iter()
         .map(|bytes| LeanSigPubKey::from_ssz_bytes(bytes))
         .collect();
-    let pub_keys = pub_keys
-        .map_err(|e| PyValueError::new_err(format!("Failed to deserialize public key (SSZ): {:?}", e)))?;
+    let pub_keys = pub_keys.map_err(|e| {
+        PyValueError::new_err(format!("Failed to deserialize public key (SSZ): {:?}", e))
+    })?;
 
     // Deserialize signatures using SSZ
     let signatures: Result<Vec<LeanSigSignature>, _> = signatures_bytes
         .iter()
         .map(|bytes| LeanSigSignature::from_ssz_bytes(bytes))
         .collect();
-    let signatures = signatures
-        .map_err(|e| PyValueError::new_err(format!("Failed to deserialize signature (SSZ): {:?}", e)))?;
+    let signatures = signatures.map_err(|e| {
+        PyValueError::new_err(format!("Failed to deserialize signature (SSZ): {:?}", e))
+    })?;
 
     // Convert message_hash to array
     let message_array: [u8; 32] = message_hash
@@ -128,8 +130,9 @@ fn verify_aggregated_signatures(
         .iter()
         .map(|bytes| LeanSigPubKey::from_ssz_bytes(bytes))
         .collect();
-    let pub_keys = pub_keys
-        .map_err(|e| PyValueError::new_err(format!("Failed to deserialize public key (SSZ): {:?}", e)))?;
+    let pub_keys = pub_keys.map_err(|e| {
+        PyValueError::new_err(format!("Failed to deserialize public key (SSZ): {:?}", e))
+    })?;
 
     // Convert message_hash to array
     let message_array: [u8; 32] = message_hash
@@ -145,35 +148,6 @@ fn verify_aggregated_signatures(
         .map_err(|e| PyValueError::new_err(format!("Verification failed: {:?}", e)))?;
 
     Ok(())
-}
-
-/// Convert bincode-encoded Devnet2XmssAggregateSignature to SSZ encoding.
-///
-/// Args:
-///     bincode_bytes: Bincode-encoded aggregated signature
-///
-/// Returns:
-///     SSZ-encoded aggregated signature as bytes
-#[pyfunction]
-fn ssz_encode_aggregate_signature(bincode_bytes: Vec<u8>) -> PyResult<Vec<u8>> {
-    let agg_sig: Devnet2XmssAggregateSignature = bincode::deserialize(&bincode_bytes)
-        .map_err(|e| PyValueError::new_err(format!("Failed to deserialize bincode: {}", e)))?;
-    Ok(agg_sig.as_ssz_bytes())
-}
-
-/// Convert SSZ-encoded Devnet2XmssAggregateSignature to bincode encoding.
-///
-/// Args:
-///     ssz_bytes: SSZ-encoded aggregated signature
-///
-/// Returns:
-///     Bincode-encoded aggregated signature as bytes
-#[pyfunction]
-fn ssz_decode_aggregate_signature(ssz_bytes: Vec<u8>) -> PyResult<Vec<u8>> {
-    let agg_sig = Devnet2XmssAggregateSignature::from_ssz_bytes(&ssz_bytes)
-        .map_err(|e| PyValueError::new_err(format!("Failed to decode SSZ: {:?}", e)))?;
-    bincode::serialize(&agg_sig)
-        .map_err(|e| PyValueError::new_err(format!("Failed to serialize to bincode: {}", e)))
 }
 
 /// Get the mode this module was compiled with.
@@ -194,8 +168,6 @@ fn lean_multisig_test(py_module: &Bound<'_, PyModule>) -> PyResult<()> {
     py_module.add_function(wrap_pyfunction!(setup_verifier, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(aggregate_signatures, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(verify_aggregated_signatures, py_module)?)?;
-    py_module.add_function(wrap_pyfunction!(ssz_encode_aggregate_signature, py_module)?)?;
-    py_module.add_function(wrap_pyfunction!(ssz_decode_aggregate_signature, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(get_mode, py_module)?)?;
     Ok(())
 }
@@ -209,8 +181,6 @@ fn lean_multisig_prod(py_module: &Bound<'_, PyModule>) -> PyResult<()> {
     py_module.add_function(wrap_pyfunction!(setup_verifier, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(aggregate_signatures, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(verify_aggregated_signatures, py_module)?)?;
-    py_module.add_function(wrap_pyfunction!(ssz_encode_aggregate_signature, py_module)?)?;
-    py_module.add_function(wrap_pyfunction!(ssz_decode_aggregate_signature, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(get_mode, py_module)?)?;
     Ok(())
 }

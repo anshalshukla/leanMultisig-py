@@ -139,18 +139,6 @@ def verify_aggregated_signatures(
     return module.verify_aggregated_signatures(pub_keys_bytes, message_hash, agg_signature_bytes, epoch)
 
 
-def ssz_encode_aggregate_signature(bincode_bytes, *, test_mode: Optional[bool] = None, mode: Optional[str] = None):
-    """Convert a bincode aggregate signature to SSZ using the requested module."""
-    module = _select_module(test_mode=test_mode, mode=mode)
-    return module.ssz_encode_aggregate_signature(bincode_bytes)
-
-
-def ssz_decode_aggregate_signature(ssz_bytes, *, test_mode: Optional[bool] = None, mode: Optional[str] = None):
-    """Convert an SSZ aggregate signature to bincode using the requested module."""
-    module = _select_module(test_mode=test_mode, mode=mode)
-    return module.ssz_decode_aggregate_signature(ssz_bytes)
-
-
 def get_mode(*, test_mode: Optional[bool] = None, mode: Optional[str] = None) -> str:
     """Return the mode label ("test" or "prod") for the selected module."""
     module = _select_module(test_mode=test_mode, mode=mode)
@@ -167,7 +155,5 @@ __all__ = [
     "setup_verifier",
     "aggregate_signatures",
     "verify_aggregated_signatures",
-    "ssz_encode_aggregate_signature",
-    "ssz_decode_aggregate_signature",
     "get_mode",
 ]

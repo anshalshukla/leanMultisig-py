@@ -1122,11 +1122,9 @@ dependencies = [
 name = "lean-multisig-py"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "ethereum_ssz",
  "lean-multisig",
  "pyo3",
- "serde",
 ]
 
 [[package]]

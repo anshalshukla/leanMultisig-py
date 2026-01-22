@@ -1,0 +1,2 @@
+include lean_multisig_py/*.so
+include lean_multisig_py/*.pyd
