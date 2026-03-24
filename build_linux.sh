@@ -36,57 +36,37 @@ if [ -z "$MATURIN" ]; then
 fi
 echo "Using maturin: $MATURIN"
 
-# Function to build a variant
-build_variant() {
+# Function to build for a specific platform and Python version
+build_for_python() {
     local PYVER="$1"
-    local VARIANT="$2"
-    local PLATFORM="$3"  # "macos" or "linux"
-    
+    local PLATFORM="$2"  # "macos" or "linux"
+
     local PYVER_SHORT="${PYVER//./}"  # 3.12 -> 312
-    
-    if [ "$VARIANT" = "test" ]; then
-        FEATURES="--features test_config"
-        LIB_NAME="lean_multisig_test"
-    else
-        FEATURES=""
-        LIB_NAME="lean_multisig_prod"
-    fi
-    
+
     echo ""
     echo "=============================================="
-    echo "Building $LIB_NAME for $PLATFORM (Python $PYVER)..."
+    echo "Building lean_multisig for $PLATFORM (Python $PYVER)..."
     echo "=============================================="
-    
-    # Update Cargo.toml with correct lib name
-    cp "$SCRIPT_DIR/Cargo.toml" "$SCRIPT_DIR/Cargo.toml.bak"
-    sed -i.tmp "s/name = \"lean_multisig\"/name = \"$LIB_NAME\"/" "$SCRIPT_DIR/Cargo.toml"
-    rm -f "$SCRIPT_DIR/Cargo.toml.tmp"
-    
+
     local BUILD_SUCCESS=false
-    
+
     if [ "$PLATFORM" = "macos" ]; then
-        # Build for macOS locally
         if command -v "python$PYVER" &> /dev/null; then
-            RUSTFLAGS="-C target-cpu=native" $MATURIN build --release $FEATURES -i "python$PYVER" && BUILD_SUCCESS=true
+            RUSTFLAGS="-C target-cpu=native" $MATURIN build --release -i "python$PYVER" && BUILD_SUCCESS=true
         else
             echo "Warning: python$PYVER not found, skipping macOS build"
         fi
     else
-        # Build for Linux using Docker
         docker run --rm \
             --platform linux/amd64 \
             -v "$SCRIPT_DIR":/io \
             -v "$PARENT_DIR/leanMultisig":/leanMultisig \
             -w /io \
             ghcr.io/pyo3/maturin:latest \
-            build --release $FEATURES -i "python$PYVER" && BUILD_SUCCESS=true
+            build --release -i "python$PYVER" && BUILD_SUCCESS=true
     fi
-    
-    # Restore original Cargo.toml
-    mv "$SCRIPT_DIR/Cargo.toml.bak" "$SCRIPT_DIR/Cargo.toml"
-    
+
     if [ "$BUILD_SUCCESS" = true ]; then
-        # Find and extract the wheel
         if [ "$PLATFORM" = "macos" ]; then
             WHEEL=$(ls -t "$SCRIPT_DIR/target/wheels/"*cp${PYVER_SHORT}*macos*.whl 2>/dev/null | head -1)
             DEST_SUFFIX="darwin.so"
@@ -97,22 +77,22 @@ build_variant() {
             fi
             DEST_SUFFIX="x86_64-linux-gnu.so"
         fi
-        
+
         if [ -n "$WHEEL" ] && [ -f "$WHEEL" ]; then
             echo "Extracting from $WHEEL..."
-            
+
             TMP_DIR=$(mktemp -d)
             unzip -o "$WHEEL" -d "$TMP_DIR" > /dev/null
-            
+
             SO_FILE=$(find "$TMP_DIR" -name "*.so" -type f | head -1)
             if [ -n "$SO_FILE" ]; then
-                DEST_NAME="${LIB_NAME}.cpython-${PYVER_SHORT}-${DEST_SUFFIX}"
+                DEST_NAME="lean_multisig.cpython-${PYVER_SHORT}-${DEST_SUFFIX}"
                 cp "$SO_FILE" "$PACKAGE_DIR/$DEST_NAME"
                 echo "Created: $DEST_NAME"
             else
                 echo "Warning: No .so file found in wheel"
             fi
-            
+
             rm -rf "$TMP_DIR"
         else
             echo "Warning: No wheel found for $PLATFORM Python $PYVER"
@@ -126,8 +106,7 @@ echo "Building for macOS (native)..."
 echo "=========================================="
 
 for PYVER in $PYTHON_VERSIONS; do
-    build_variant "$PYVER" "prod" "macos"
-    build_variant "$PYVER" "test" "macos"
+    build_for_python "$PYVER" "macos"
 done
 
 echo ""
@@ -137,8 +116,7 @@ echo "=========================================="
 echo "(This may take a while on Apple Silicon due to emulation)"
 
 for PYVER in $PYTHON_VERSIONS; do
-    build_variant "$PYVER" "prod" "linux"
-    build_variant "$PYVER" "test" "linux"
+    build_for_python "$PYVER" "linux"
 done
 
 echo ""

@@ -1,0 +1,204 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0). Leave empty for dry run (artifacts only, no release)."
+        required: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHON_VERSIONS: "3.12 3.13 3.14"
+  PACKAGE_NAME: lean_multisig_py
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+        config: ["prod", "test"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
+      - name: Install maturin
+        run: pip install maturin
+
+      - name: Build wheel
+        run: |
+          if [ "${{ matrix.config }}" = "test" ]; then
+            maturin build --release -i python${{ matrix.python-version }} --features test-config
+          else
+            maturin build --release -i python${{ matrix.python-version }}
+          fi
+
+      - name: Extract .so from wheel
+        run: |
+          PYVER="${{ matrix.python-version }}"
+          PYVER_SHORT="${PYVER//./}"
+          CONFIG="${{ matrix.config }}"
+          WHEEL=$(ls -t target/wheels/*cp${PYVER_SHORT}*.whl | head -1)
+          echo "Built wheel: $WHEEL"
+
+          mkdir -p extracted
+          python -m zipfile -e "$WHEEL" extracted/
+          SO=$(find extracted -name "*.so" -type f | head -1)
+
+          if [ "$CONFIG" = "test" ]; then
+            DEST="${PACKAGE_NAME}/lean_multisig_test.cpython-${PYVER_SHORT}-darwin.so"
+          else
+            DEST="${PACKAGE_NAME}/lean_multisig.cpython-${PYVER_SHORT}-darwin.so"
+          fi
+          cp "$SO" "$DEST"
+          echo "Extracted: $DEST ($(du -h "$DEST" | cut -f1))"
+
+      - name: Upload .so artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: so-macos-arm64-${{ matrix.config }}-py${{ matrix.python-version }}
+          path: ${{ env.PACKAGE_NAME }}/lean_multisig*.cpython-*-darwin.so
+
+  build-linux-x86_64:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+        config: ["prod", "test"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
+      - name: Install maturin
+        run: pip install maturin
+
+      - name: Build wheel
+        run: |
+          if [ "${{ matrix.config }}" = "test" ]; then
+            maturin build --release -i python${{ matrix.python-version }} --features test-config
+          else
+            maturin build --release -i python${{ matrix.python-version }}
+          fi
+
+      - name: Extract .so from wheel
+        run: |
+          PYVER="${{ matrix.python-version }}"
+          PYVER_SHORT="${PYVER//./}"
+          CONFIG="${{ matrix.config }}"
+          WHEEL=$(ls -t target/wheels/*cp${PYVER_SHORT}*.whl | head -1)
+          echo "Built wheel: $WHEEL"
+
+          mkdir -p extracted
+          python -m zipfile -e "$WHEEL" extracted/
+          SO=$(find extracted -name "*.so" -type f | head -1)
+
+          if [ "$CONFIG" = "test" ]; then
+            DEST="${PACKAGE_NAME}/lean_multisig_test.cpython-${PYVER_SHORT}-x86_64-linux-gnu.so"
+          else
+            DEST="${PACKAGE_NAME}/lean_multisig.cpython-${PYVER_SHORT}-x86_64-linux-gnu.so"
+          fi
+          cp "$SO" "$DEST"
+          echo "Extracted: $DEST ($(du -h "$DEST" | cut -f1))"
+
+      - name: Upload .so artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: so-linux-x86_64-${{ matrix.config }}-py${{ matrix.python-version }}
+          path: ${{ env.PACKAGE_NAME }}/lean_multisig*.cpython-*-x86_64-linux-gnu.so
+
+  package:
+    needs: [build-macos-arm64, build-linux-x86_64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download all .so artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: so-*
+          path: ${{ env.PACKAGE_NAME }}/
+          merge-multiple: true
+
+      - name: List bundled .so files
+        run: ls -lh ${PACKAGE_NAME}/*.so
+
+      - name: Build sdist and wheel
+        run: |
+          pip install build
+          python -m build --sdist --wheel --outdir dist/
+
+      - name: List dist contents
+        run: |
+          ls -lh dist/
+          for whl in dist/*.whl; do
+            echo "--- $whl ---"
+            python -m zipfile -l "$whl" | grep -E "\.so$|\.pyd$"
+          done
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  release:
+    needs: [package]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag != ''
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Download all .so artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: so-*
+          path: so-files/
+          merge-multiple: true
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/*
+            so-files/*.so

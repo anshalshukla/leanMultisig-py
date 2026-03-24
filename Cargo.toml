@@ -8,10 +8,12 @@ name = "lean_multisig"
 crate-type = ["cdylib"]
 
 [features]
-default = []
-test_config = ["lean-multisig/test_config"]
+test-config = ["lean-multisig/test-config"]
 
 [dependencies]
 pyo3 = { version = "0.27", features = ["extension-module"] }
-lean-multisig = { path = "../leanMultisig" }
+lean-multisig = { git = "https://github.com/leanEthereum/leanMultisig", branch = "devnet4" }
+leansig_wrapper = { git = "https://github.com/leanEthereum/leanMultisig", branch = "devnet4" }
+postcard = { version = "1.1.3", features = ["alloc"] }
+serde = { version = "1.0", features = ["derive"] }
 ssz = { package = "ethereum_ssz", version = "0.10.0" }

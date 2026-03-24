@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main, devnet4]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config: ["prod", "test"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo check (prod)
+        if: matrix.config == 'prod'
+        run: cargo check
+
+      - name: Cargo check (test-config)
+        if: matrix.config == 'test'
+        run: cargo check --features test-config
+
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            python-version: "3.14"
+            config: prod
+          - os: macos-14
+            python-version: "3.14"
+            config: test
+          - os: ubuntu-latest
+            python-version: "3.14"
+            config: prod
+          - os: ubuntu-latest
+            python-version: "3.14"
+            config: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
+      - name: Install maturin and test deps
+        run: pip install maturin pytest
+
+      - name: Build and install (prod)
+        if: matrix.config == 'prod'
+        run: maturin develop --release
+
+      - name: Build and install (test-config)
+        if: matrix.config == 'test'
+        run: maturin develop --release --features test-config
+
+      - name: Run tests
+        run: pytest tests/ -v
