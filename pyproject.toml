@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "lean-multisig-py"
@@ -12,9 +12,6 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["lean_multisig_py*"]
-
-[tool.setuptools.package-data]
-lean_multisig_py = ["*.so", "*.pyd"]
+[tool.maturin]
+python-source = "."
+module-name = "lean_multisig_py.lean_multisig"
