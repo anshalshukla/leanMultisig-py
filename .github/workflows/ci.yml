@@ -70,7 +70,19 @@ jobs:
 
       - name: Build and install (test-config)
         if: matrix.config == 'test'
-        run: maturin develop --release --features test-config
+        run: |
+          maturin develop --release --features test-config
+          # Rename the .so: pymodule is lean_multisig_test but maturin outputs lean_multisig
+          SITE=$(python -c "import sysconfig; print(sysconfig.get_path('platlib'))")
+          echo "Looking for .so in: $SITE/lean_multisig_py/"
+          ls -la "$SITE/lean_multisig_py/" || true
+          for f in "$SITE"/lean_multisig_py/lean_multisig.cpython-*; do
+            if [ -f "$f" ]; then
+              dest="${f/lean_multisig.cpython/lean_multisig_test.cpython}"
+              echo "Renaming: $f -> $dest"
+              mv "$f" "$dest"
+            fi
+          done
 
       - name: Run tests
         run: pytest tests/ -v

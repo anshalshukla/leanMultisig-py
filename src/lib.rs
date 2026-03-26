@@ -1,32 +1,104 @@
-use ::lean_multisig::{
-    setup_prover as lm_setup_prover, setup_verifier as lm_setup_verifier, xmss_aggregate,
-    xmss_verify_aggregation, AggregatedXMSS,
+use backend::{precompute_dft_twiddles, KoalaBear};
+use rec_aggregation::{
+    init_aggregation_bytecode, xmss_aggregate, xmss_verify_aggregation, AggregatedXMSS,
 };
-use leansig_wrapper::{XmssPublicKey, XmssSignature, MESSAGE_LENGTH};
+use leansig_wrapper::{
+    xmss_public_key_from_ssz, xmss_signature_from_ssz, XmssPublicKey, XmssSignature,
+    MESSAGE_LENGTH,
+};
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use ssz::{Decode, Encode};
+use ssz::{Decode, DecodeError, Encode};
+
+/// Mode constant - "test" when compiled with test-config feature, "prod" otherwise.
+#[cfg(feature = "test-config")]
+pub const MODE: &str = "test";
+
+#[cfg(not(feature = "test-config"))]
+pub const MODE: &str = "prod";
+
+/// SSZ container for the devnet4 aggregated XMSS proof.
+///
+/// This wraps the native `AggregatedXMSS` serialization (postcard + lz4)
+/// as an opaque byte blob for the consensus layer.
+///
+/// SSZ layout (variable-length container):
+///   offset(4 bytes) | proof_bytes(variable)
+#[derive(Debug, Clone)]
+pub struct Devnet4XmssAggregateSignature {
+    /// Native serialized AggregatedXMSS (postcard + lz4 compressed).
+    /// Contains pub_keys, proof, and bytecode_point (None encoded as absent).
+    pub proof_bytes: Vec<u8>,
+}
+
+impl Encode for Devnet4XmssAggregateSignature {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        self.proof_bytes.len()
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        buf.extend_from_slice(&self.proof_bytes);
+    }
+}
+
+impl Decode for Devnet4XmssAggregateSignature {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, DecodeError> {
+        if bytes.is_empty() {
+            return Err(DecodeError::InvalidByteLength {
+                len: 0,
+                expected: 1,
+            });
+        }
+
+        Ok(Self {
+            proof_bytes: bytes.to_vec(),
+        })
+    }
+}
+
+impl Devnet4XmssAggregateSignature {
+    /// Create from a native AggregatedXMSS.
+    pub fn from_aggregated(agg: &AggregatedXMSS) -> Self {
+        Self {
+            proof_bytes: agg.serialize(),
+        }
+    }
+
+    /// Deserialize back to native AggregatedXMSS.
+    pub fn to_aggregated(&self) -> Option<AggregatedXMSS> {
+        AggregatedXMSS::deserialize(&self.proof_bytes)
+    }
+}
 
 /// Setup the prover for XMSS aggregation.
 /// Call this once before first aggregation to avoid slowdown.
 #[pyfunction]
 fn setup_prover() {
-    lm_setup_prover();
+    init_aggregation_bytecode();
+    precompute_dft_twiddles::<KoalaBear>(1 << 24);
 }
 
 /// Setup the verifier for XMSS aggregation.
 /// Call this once before first verification to avoid slowdown.
 #[pyfunction]
 fn setup_verifier() {
-    lm_setup_verifier();
+    init_aggregation_bytecode();
 }
 
 /// Aggregate XMSS signatures.
 ///
 /// Args:
-///     pub_keys_bytes: List of serialized public keys (each as bytes, postcard format)
-///     signatures_bytes: List of serialized signatures (each as bytes, postcard format)
+///     pub_keys_bytes: List of serialized public keys (each as bytes, SSZ format)
+///     signatures_bytes: List of serialized signatures (each as bytes, SSZ format)
 ///     message_hash: 32-byte message hash
 ///     slot: Slot number (u32)
 ///     log_inv_rate: Inverse rate exponent for proof (1-4, lower = faster but bigger proofs)
@@ -65,23 +137,25 @@ fn aggregate_signatures(
         )));
     }
 
-    // Deserialize public keys
-    let pub_keys: Result<Vec<XmssPublicKey>, _> = pub_keys_bytes
+    // Deserialize public keys from SSZ
+    let pub_keys: Vec<XmssPublicKey> = pub_keys_bytes
         .iter()
-        .map(|bytes| postcard::from_bytes(bytes))
-        .collect();
-    let pub_keys = pub_keys.map_err(|e| {
-        PyValueError::new_err(format!("Failed to deserialize public key: {:?}", e))
-    })?;
+        .enumerate()
+        .map(|(i, bytes)| {
+            xmss_public_key_from_ssz(bytes)
+                .map_err(|()| PyValueError::new_err(format!("Failed to deserialize public key {} (SSZ)", i)))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
 
-    // Deserialize signatures
-    let signatures: Result<Vec<XmssSignature>, _> = signatures_bytes
+    // Deserialize signatures from SSZ
+    let signatures: Vec<XmssSignature> = signatures_bytes
         .iter()
-        .map(|bytes| postcard::from_bytes(bytes))
-        .collect();
-    let signatures = signatures.map_err(|e| {
-        PyValueError::new_err(format!("Failed to deserialize signature: {:?}", e))
-    })?;
+        .enumerate()
+        .map(|(i, bytes)| {
+            xmss_signature_from_ssz(bytes)
+                .map_err(|()| PyValueError::new_err(format!("Failed to deserialize signature {} (SSZ)", i)))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
 
     // Build raw_xmss pairs
     let raw_xmss: Vec<(XmssPublicKey, XmssSignature)> =
@@ -166,44 +240,57 @@ fn verify_aggregated_signatures(
     Ok(())
 }
 
-/// SSZ-encode an aggregated signature.
+/// SSZ-encode an aggregated signature (native bytes -> SSZ container).
 ///
-/// Wraps the native serialized bytes as an SSZ byte list.
-///
-/// Args:
-///     agg_signature_bytes: Serialized aggregated signature (from aggregate_signatures)
-///
-/// Returns:
-///     SSZ-encoded bytes
+/// Wraps the native serialized AggregatedXMSS as a Devnet4XmssAggregateSignature
+/// SSZ container.
 #[pyfunction]
 fn ssz_encode_aggregate_signature(agg_signature_bytes: Vec<u8>) -> Vec<u8> {
-    agg_signature_bytes.as_ssz_bytes()
+    let container = Devnet4XmssAggregateSignature {
+        proof_bytes: agg_signature_bytes,
+    };
+    container.as_ssz_bytes()
 }
 
-/// SSZ-decode an aggregated signature.
+/// SSZ-decode an aggregated signature (SSZ container -> native bytes).
 ///
-/// Args:
-///     ssz_bytes: SSZ-encoded aggregated signature bytes
-///
-/// Returns:
-///     Native serialized aggregated signature bytes
-///
-/// Raises:
-///     ValueError: If SSZ decoding fails
+/// Decodes a Devnet4XmssAggregateSignature SSZ container back to native
+/// serialized AggregatedXMSS bytes.
 #[pyfunction]
 fn ssz_decode_aggregate_signature(ssz_bytes: Vec<u8>) -> PyResult<Vec<u8>> {
-    Vec::<u8>::from_ssz_bytes(&ssz_bytes)
-        .map_err(|e| PyValueError::new_err(format!("SSZ decode failed: {:?}", e)))
+    let container = Devnet4XmssAggregateSignature::from_ssz_bytes(&ssz_bytes)
+        .map_err(|e| PyValueError::new_err(format!("SSZ decode failed: {:?}", e)))?;
+    Ok(container.proof_bytes)
 }
 
-/// Python module for lean-multisig XMSS aggregation
-#[pymodule]
-fn lean_multisig(py_module: &Bound<'_, PyModule>) -> PyResult<()> {
+/// Get the mode this module was compiled with.
+#[pyfunction]
+fn get_mode() -> &'static str {
+    MODE
+}
+
+fn register_functions(py_module: &Bound<'_, PyModule>) -> PyResult<()> {
+    py_module.add("MODE", MODE)?;
     py_module.add_function(wrap_pyfunction!(setup_prover, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(setup_verifier, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(aggregate_signatures, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(verify_aggregated_signatures, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(ssz_encode_aggregate_signature, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(ssz_decode_aggregate_signature, py_module)?)?;
+    py_module.add_function(wrap_pyfunction!(get_mode, py_module)?)?;
     Ok(())
+}
+
+/// Python module for lean-multisig XMSS aggregation (test mode).
+#[cfg(feature = "test-config")]
+#[pymodule]
+fn lean_multisig_test(py_module: &Bound<'_, PyModule>) -> PyResult<()> {
+    register_functions(py_module)
+}
+
+/// Python module for lean-multisig XMSS aggregation (prod mode).
+#[cfg(not(feature = "test-config"))]
+#[pymodule]
+fn lean_multisig(py_module: &Bound<'_, PyModule>) -> PyResult<()> {
+    register_functions(py_module)
 }

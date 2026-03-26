@@ -3,6 +3,11 @@
 import pytest
 
 
+def _has_module():
+    import lean_multisig_py as lm
+    return lm._module is not None or lm._test_module is not None
+
+
 def test_module_import():
     """Test that the module can be imported."""
     import lean_multisig_py as lm
@@ -11,13 +16,26 @@ def test_module_import():
     assert hasattr(lm, "setup_verifier")
     assert hasattr(lm, "aggregate_signatures")
     assert hasattr(lm, "verify_aggregated_signatures")
+    assert hasattr(lm, "get_mode")
+    assert hasattr(lm, "MODE")
+
+
+def test_mode():
+    """Test that MODE is set correctly."""
+    import lean_multisig_py as lm
+
+    if not _has_module():
+        pytest.skip("Rust module not built")
+
+    assert lm.MODE in ("prod", "test")
+    assert lm.get_mode() in ("prod", "test")
 
 
 def test_setup():
     """Test setup functions don't raise."""
     import lean_multisig_py as lm
 
-    if lm._module is None:
+    if not _has_module():
         pytest.skip("Rust module not built")
 
     lm.setup_prover()
@@ -28,11 +46,11 @@ def test_aggregate_signatures_validation():
     """Test input validation for aggregate_signatures."""
     import lean_multisig_py as lm
 
-    if lm._module is None:
+    if not _has_module():
         pytest.skip("Rust module not built")
 
     # Test message_hash length validation
-    with pytest.raises(ValueError, match="message_hash must be exactly 32 bytes"):
+    with pytest.raises(ValueError, match="message_hash must be exactly"):
         lm.aggregate_signatures(
             [b"pubkey1"],
             [b"sig1"],
@@ -56,11 +74,11 @@ def test_verify_signatures_validation():
     """Test input validation for verify_aggregated_signatures."""
     import lean_multisig_py as lm
 
-    if lm._module is None:
+    if not _has_module():
         pytest.skip("Rust module not built")
 
     # Test message_hash length validation
-    with pytest.raises(ValueError, match="message_hash must be exactly 32 bytes"):
+    with pytest.raises(ValueError, match="message_hash must be exactly"):
         lm.verify_aggregated_signatures(
             b"short",  # Not 32 bytes
             b"agg_sig",
