@@ -15,3 +15,7 @@ classifiers = [
 [tool.maturin]
 python-source = "."
 module-name = "lean_multisig_py.lean_multisig"
+include = [
+    { path = "lean_multisig_py/lean_multisig_test*.so", format = "wheel" },
+    { path = "lean_multisig_py/lean_multisig_test*.pyd", format = "wheel" },
+]
