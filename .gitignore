@@ -6,6 +6,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+!lean_multisig_py/*.so
 .Python
 build/
 develop-eggs/

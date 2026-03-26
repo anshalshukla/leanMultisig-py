@@ -1,19 +1,11 @@
 #!/bin/bash
 # Build .so files for both macOS and Linux x86_64
-# Builds for Python 3.12, 3.13, 3.14
+# Builds prod and test variants for Python 3.12, 3.13, 3.14
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PARENT_DIR="$(dirname "$SCRIPT_DIR")"
 PACKAGE_DIR="$SCRIPT_DIR/lean_multisig_py"
-
-# Check if leanMultisig exists
-if [ ! -d "$PARENT_DIR/leanMultisig" ]; then
-    echo "Error: ../leanMultisig not found"
-    echo "Make sure leanMultisig repo is at $PARENT_DIR/leanMultisig"
-    exit 1
-fi
 
 # Python versions to build for
 PYTHON_VERSIONS="3.12 3.13 3.14"
@@ -36,23 +28,44 @@ if [ -z "$MATURIN" ]; then
 fi
 echo "Using maturin: $MATURIN"
 
-# Function to build for a specific platform and Python version
-build_for_python() {
+# Function to build a variant
+build_variant() {
     local PYVER="$1"
-    local PLATFORM="$2"  # "macos" or "linux"
+    local VARIANT="$2"
+    local PLATFORM="$3"  # "macos" or "linux"
 
     local PYVER_SHORT="${PYVER//./}"  # 3.12 -> 312
 
+    if [ "$VARIANT" = "test" ]; then
+        FEATURES="--features test-config"
+        LIB_NAME="lean_multisig_test"
+    else
+        FEATURES=""
+        LIB_NAME="lean_multisig"
+    fi
+
     echo ""
     echo "=============================================="
-    echo "Building lean_multisig for $PLATFORM (Python $PYVER)..."
+    echo "Building $LIB_NAME for $PLATFORM (Python $PYVER)..."
     echo "=============================================="
+
+    # Update Cargo.toml with correct lib name
+    cp "$SCRIPT_DIR/Cargo.toml" "$SCRIPT_DIR/Cargo.toml.bak"
+    sed -i.tmp "s/name = \"lean_multisig\"/name = \"$LIB_NAME\"/" "$SCRIPT_DIR/Cargo.toml"
+    rm -f "$SCRIPT_DIR/Cargo.toml.tmp"
 
     local BUILD_SUCCESS=false
 
     if [ "$PLATFORM" = "macos" ]; then
-        if command -v "python$PYVER" &> /dev/null; then
-            RUSTFLAGS="-C target-cpu=native" $MATURIN build --release -i "python$PYVER" && BUILD_SUCCESS=true
+        # Resolve the real python path (bypass asdf shims and venv)
+        local PYTHON_BIN
+        PYTHON_BIN=$(asdf where python "$PYVER" 2>/dev/null)/bin/python$PYVER 2>/dev/null || true
+        if [ ! -x "$PYTHON_BIN" ]; then
+            PYTHON_BIN=$(command -v "python$PYVER" 2>/dev/null || true)
+        fi
+        if [ -n "$PYTHON_BIN" ] && [ -x "$PYTHON_BIN" ]; then
+            echo "Using interpreter: $PYTHON_BIN"
+            RUSTFLAGS="-C target-cpu=native" $MATURIN build --release $FEATURES -i "$PYTHON_BIN" && BUILD_SUCCESS=true
         else
             echo "Warning: python$PYVER not found, skipping macOS build"
         fi
@@ -60,11 +73,13 @@ build_for_python() {
         docker run --rm \
             --platform linux/amd64 \
             -v "$SCRIPT_DIR":/io \
-            -v "$PARENT_DIR/leanMultisig":/leanMultisig \
             -w /io \
             ghcr.io/pyo3/maturin:latest \
-            build --release -i "python$PYVER" && BUILD_SUCCESS=true
+            build --release $FEATURES -i "python$PYVER" && BUILD_SUCCESS=true
     fi
+
+    # Restore original Cargo.toml
+    mv "$SCRIPT_DIR/Cargo.toml.bak" "$SCRIPT_DIR/Cargo.toml"
 
     if [ "$BUILD_SUCCESS" = true ]; then
         if [ "$PLATFORM" = "macos" ]; then
@@ -86,7 +101,7 @@ build_for_python() {
 
             SO_FILE=$(find "$TMP_DIR" -name "*.so" -type f | head -1)
             if [ -n "$SO_FILE" ]; then
-                DEST_NAME="lean_multisig.cpython-${PYVER_SHORT}-${DEST_SUFFIX}"
+                DEST_NAME="${LIB_NAME}.cpython-${PYVER_SHORT}-${DEST_SUFFIX}"
                 cp "$SO_FILE" "$PACKAGE_DIR/$DEST_NAME"
                 echo "Created: $DEST_NAME"
             else
@@ -106,7 +121,8 @@ echo "Building for macOS (native)..."
 echo "=========================================="
 
 for PYVER in $PYTHON_VERSIONS; do
-    build_for_python "$PYVER" "macos"
+    build_variant "$PYVER" "prod" "macos"
+    build_variant "$PYVER" "test" "macos"
 done
 
 echo ""
@@ -116,7 +132,8 @@ echo "=========================================="
 echo "(This may take a while on Apple Silicon due to emulation)"
 
 for PYVER in $PYTHON_VERSIONS; do
-    build_for_python "$PYVER" "linux"
+    build_variant "$PYVER" "prod" "linux"
+    build_variant "$PYVER" "test" "linux"
 done
 
 echo ""
