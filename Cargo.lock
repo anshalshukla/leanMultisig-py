@@ -14,7 +14,7 @@ dependencies = [
 [[package]]
 name = "air"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "backend",
  "tracing",
@@ -347,7 +347,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "backend"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "mt-air",
  "mt-fiat-shamir",
@@ -1185,7 +1185,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 [[package]]
 name = "lean-multisig"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "air",
  "backend",
@@ -1210,12 +1210,13 @@ dependencies = [
  "pyo3",
  "rec_aggregation",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "lean_compiler"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "air",
  "backend",
@@ -1231,7 +1232,7 @@ dependencies = [
 [[package]]
 name = "lean_prover"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "air",
  "backend",
@@ -1249,7 +1250,7 @@ dependencies = [
 [[package]]
 name = "lean_vm"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "air",
  "backend",
@@ -1265,7 +1266,7 @@ dependencies = [
 [[package]]
 name = "leansig"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanSig?branch=devnet4#76e38811e2e8665bb1a7b7e8858e78ed22c5d5e8"
+source = "git+https://github.com/leanEthereum/leanSig?branch=devnet4#f7d834fcd2673aa31e5d3c314edf97c7c70ba1fd"
 dependencies = [
  "dashmap",
  "ethereum_ssz",
@@ -1285,7 +1286,7 @@ dependencies = [
 [[package]]
 name = "leansig_fast_keygen"
 version = "0.1.0"
-source = "git+https://github.com/TomWambsgans/leanSig?branch=devnet4-fast-keygen#2d7fa1d883ec8094803961c1933413d6b405126f"
+source = "git+https://github.com/TomWambsgans/leanSig?branch=devnet4-fast-keygen#a782c7fc608b7894fa8b2f79b45353bd942868d7"
 dependencies = [
  "dashmap",
  "ethereum_ssz",
@@ -1305,7 +1306,7 @@ dependencies = [
 [[package]]
 name = "leansig_wrapper"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "backend",
  "ethereum_ssz",
@@ -1390,7 +1391,7 @@ dependencies = [
 [[package]]
 name = "mt-air"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "mt-field",
  "mt-poly",
@@ -1399,7 +1400,7 @@ dependencies = [
 [[package]]
 name = "mt-fiat-shamir"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "mt-field",
  "mt-koala-bear",
@@ -1412,7 +1413,7 @@ dependencies = [
 [[package]]
 name = "mt-field"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "itertools 0.14.0",
  "mt-utils",
@@ -1427,7 +1428,7 @@ dependencies = [
 [[package]]
 name = "mt-koala-bear"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "itertools 0.14.0",
  "mt-field",
@@ -1443,7 +1444,7 @@ dependencies = [
 [[package]]
 name = "mt-poly"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "itertools 0.14.0",
  "mt-field",
@@ -1456,7 +1457,7 @@ dependencies = [
 [[package]]
 name = "mt-sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "mt-air",
  "mt-fiat-shamir",
@@ -1469,7 +1470,7 @@ dependencies = [
 [[package]]
 name = "mt-symetric"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "mt-field",
  "mt-koala-bear",
@@ -1479,7 +1480,7 @@ dependencies = [
 [[package]]
 name = "mt-utils"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "serde",
 ]
@@ -1487,7 +1488,7 @@ dependencies = [
 [[package]]
 name = "mt-whir"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "itertools 0.14.0",
  "mt-fiat-shamir",
@@ -2125,7 +2126,7 @@ dependencies = [
 [[package]]
 name = "rec_aggregation"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "air",
  "backend",
@@ -2487,7 +2488,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 [[package]]
 name = "sub_protocols"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "backend",
  "lean_vm",
@@ -2760,7 +2761,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet4#5cbfa1b5c58ba799c2a8bfcd901ed94f3ff5a2a2"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet4#addb5ab3d59d26d92c14a90161ccb751e4223dc4"
 dependencies = [
  "backend",
  "tracing",
