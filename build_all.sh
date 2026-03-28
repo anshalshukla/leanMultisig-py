@@ -176,7 +176,20 @@ extract_so() {
     unzip -o "$WHEEL" -d "$TMP_DIR" > /dev/null
 
     local SO_FILE
-    SO_FILE=$(find "$TMP_DIR" -name "*.so" -type f | head -1)
+    # Match exactly the expected .so by name to avoid picking up bundled .so files
+    SO_FILE=$(find "$TMP_DIR" -name "$DEST_NAME" -type f | head -1)
+    # Fallback: match by platform pattern
+    if [ -z "$SO_FILE" ]; then
+        if echo "$DEST_NAME" | grep -q linux; then
+            SO_FILE=$(find "$TMP_DIR" -name "*linux*.so" -type f | head -1)
+        else
+            SO_FILE=$(find "$TMP_DIR" -name "*darwin*.so" -type f | head -1)
+        fi
+    fi
+    # Last resort
+    if [ -z "$SO_FILE" ]; then
+        SO_FILE=$(find "$TMP_DIR" -name "*.so" -type f | head -1)
+    fi
     if [ -n "$SO_FILE" ]; then
         cp "$SO_FILE" "$PACKAGE_DIR/$DEST_NAME"
         local SIZE
@@ -230,14 +243,16 @@ build_variant() {
             BUILD_OK=true
         fi
     else
-        if docker run --rm \
+        # Clean cargo target for the crate to force recompile when switching features.
+        # Docker builds share the same target/ dir, so without this, cargo reuses
+        # the prod build for test (or vice versa) since only a feature flag differs.
+        docker run --rm \
             --platform linux/amd64 \
+            --entrypoint bash \
             -v "$SCRIPT_DIR":/io \
             -w /io \
             ghcr.io/pyo3/maturin:latest \
-            build --release $FEATURES -i "python$PYVER" 2>&1; then
-            BUILD_OK=true
-        fi
+            -c "rm -rf target/release/.fingerprint/lean-multisig-py-* target/release/.fingerprint/leansig_wrapper-* target/release/.fingerprint/rec_aggregation-* target/release/.fingerprint/lean-multisig-* target/release/deps/liblean_multisig* target/release/deps/libleansig_wrapper* target/release/deps/librec_aggregation* 2>/dev/null; maturin build --release $FEATURES -i python$PYVER" 2>&1 && BUILD_OK=true
     fi
 
     # Restore Cargo.toml before extracting
