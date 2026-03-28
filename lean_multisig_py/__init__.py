@@ -75,7 +75,6 @@ def aggregate_signatures(
     message_hash,
     slot,
     log_inv_rate,
-    *,
     children_bytes=None,
     mode=None,
 ):
@@ -83,16 +82,17 @@ def aggregate_signatures(
     Aggregate XMSS signatures.
 
     Args:
-        pub_keys_bytes: List of serialized public keys (postcard format).
-        signatures_bytes: List of serialized signatures (postcard format).
+        pub_keys_bytes: List of SSZ-encoded public keys.
+        signatures_bytes: List of SSZ-encoded signatures.
         message_hash: 32-byte message hash.
         slot: Slot number.
         log_inv_rate: Inverse rate exponent (1-4, lower = faster but bigger proofs).
-        children_bytes: Optional list of serialized AggregatedXMSS for hierarchical aggregation.
+        children_bytes: Optional list of (pub_keys_ssz, agg_bytes) tuples for hierarchical aggregation.
         mode: 'prod', 'test', or None (default).
 
     Returns:
-        Serialized aggregated signature as bytes.
+        Tuple of (pub_keys_ssz, agg_bytes) where pub_keys_ssz is a list of SSZ-encoded
+        public keys and agg_bytes is the serialized aggregated signature.
     """
     return _get_module(mode).aggregate_signatures(
         pub_keys_bytes, signatures_bytes, message_hash, slot, log_inv_rate, children_bytes
@@ -100,6 +100,7 @@ def aggregate_signatures(
 
 
 def verify_aggregated_signatures(
+    pub_keys_bytes,
     message_hash,
     agg_signature_bytes,
     slot,
@@ -110,6 +111,7 @@ def verify_aggregated_signatures(
     Verify aggregated XMSS signatures.
 
     Args:
+        pub_keys_bytes: List of SSZ-encoded public keys.
         message_hash: 32-byte message hash.
         agg_signature_bytes: Serialized aggregated signature as bytes.
         slot: Slot number.
@@ -118,7 +120,7 @@ def verify_aggregated_signatures(
     Raises:
         ValueError: If verification fails.
     """
-    return _get_module(mode).verify_aggregated_signatures(message_hash, agg_signature_bytes, slot)
+    return _get_module(mode).verify_aggregated_signatures(pub_keys_bytes, message_hash, agg_signature_bytes, slot)
 
 
 def ssz_encode_aggregate_signature(agg_signature_bytes, *, mode=None):

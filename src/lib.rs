@@ -154,8 +154,8 @@ fn aggregate_signatures(
     message_hash: Vec<u8>,
     slot: u32,
     log_inv_rate: usize,
-    children_bytes: Option<Vec<Vec<u8>>>,
-) -> PyResult<Vec<u8>> {
+    children_bytes: Option<Vec<(Vec<Vec<u8>>, Vec<u8>)>>,
+) -> PyResult<(Vec<Vec<u8>>, Vec<u8>)> {
     // Validate message hash length
     if message_hash.len() != MESSAGE_LENGTH {
         return Err(PyValueError::new_err(format!(
@@ -198,17 +198,36 @@ fn aggregate_signatures(
     let raw_xmss: Vec<(XmssPublicKey, XmssSignature)> =
         pub_keys.into_iter().zip(signatures).collect();
 
-    // Deserialize children if provided
-    let children: Vec<AggregatedXMSS> = match children_bytes {
+    // Deserialize children if provided: each child is (pub_keys_ssz, agg_bytes)
+    let children_parsed: Vec<(Vec<XmssPublicKey>, AggregatedXMSS)> = match children_bytes {
         Some(cb) => cb
             .iter()
-            .map(|b| {
-                AggregatedXMSS::deserialize(b)
-                    .ok_or_else(|| PyValueError::new_err("Failed to deserialize child aggregation"))
+            .enumerate()
+            .map(|(i, (child_pks_bytes, child_agg_bytes))| {
+                let child_pks: Vec<XmssPublicKey> = child_pks_bytes
+                    .iter()
+                    .enumerate()
+                    .map(|(j, bytes)| {
+                        xmss_public_key_from_ssz(bytes).map_err(|()| {
+                            PyValueError::new_err(format!(
+                                "Failed to deserialize child {} public key {} (SSZ)", i, j
+                            ))
+                        })
+                    })
+                    .collect::<PyResult<Vec<_>>>()?;
+                let child_agg = AggregatedXMSS::deserialize(child_agg_bytes)
+                    .ok_or_else(|| {
+                        PyValueError::new_err(format!("Failed to deserialize child {} aggregation", i))
+                    })?;
+                Ok((child_pks, child_agg))
             })
             .collect::<PyResult<Vec<_>>>()?,
         None => vec![],
     };
+    let children_with_keys: Vec<(&[XmssPublicKey], AggregatedXMSS)> = children_parsed
+        .iter()
+        .map(|(pks, agg)| (pks.as_slice(), agg.clone()))
+        .collect();
 
     // Convert message_hash to array
     let message_array: [u8; MESSAGE_LENGTH] = message_hash
@@ -216,8 +235,8 @@ fn aggregate_signatures(
         .map_err(|_| PyValueError::new_err("Failed to convert message_hash to fixed-size array"))?;
 
     // Call the aggregation function
-    let agg = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        xmss_aggregate(&children, raw_xmss, &message_array, slot, log_inv_rate)
+    let (pub_keys_out, agg) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        xmss_aggregate(&children_with_keys, raw_xmss, &message_array, slot, log_inv_rate)
     }))
     .map_err(|e| {
         let msg = if let Some(s) = e.downcast_ref::<&str>() {
@@ -230,8 +249,13 @@ fn aggregate_signatures(
         PyValueError::new_err(format!("Aggregation failed: {}", msg))
     })?;
 
-    // Serialize using native method
-    Ok(agg.serialize())
+    // Serialize pub_keys using SSZ
+    let pub_keys_ssz: Vec<Vec<u8>> = pub_keys_out
+        .iter()
+        .map(|pk| leansig_wrapper::xmss_public_key_to_ssz(pk))
+        .collect();
+
+    Ok((pub_keys_ssz, agg.serialize()))
 }
 
 /// Verify aggregated XMSS signatures.
@@ -248,6 +272,7 @@ fn aggregate_signatures(
 ///     ValueError: If inputs are invalid or verification fails
 #[pyfunction]
 fn verify_aggregated_signatures(
+    pub_keys_bytes: Vec<Vec<u8>>,
     message_hash: Vec<u8>,
     agg_signature_bytes: Vec<u8>,
     slot: u32,
@@ -261,6 +286,16 @@ fn verify_aggregated_signatures(
         )));
     }
 
+    // Deserialize public keys from SSZ
+    let pub_keys: Vec<XmssPublicKey> = pub_keys_bytes
+        .iter()
+        .enumerate()
+        .map(|(i, bytes)| {
+            xmss_public_key_from_ssz(bytes)
+                .map_err(|()| PyValueError::new_err(format!("Failed to deserialize public key {} (SSZ)", i)))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+
     // Convert message_hash to array
     let message_array: [u8; MESSAGE_LENGTH] = message_hash
         .try_into()
@@ -270,8 +305,9 @@ fn verify_aggregated_signatures(
     let agg_sig = AggregatedXMSS::deserialize(&agg_signature_bytes)
         .ok_or_else(|| PyValueError::new_err("Failed to deserialize aggregated signature"))?;
 
+
     // Call the verification function
-    xmss_verify_aggregation(&agg_sig, &message_array, slot)
+    xmss_verify_aggregation(pub_keys, &agg_sig, &message_array, slot)
         .map_err(|e| PyValueError::new_err(format!("Verification failed: {:?}", e)))?;
 
     Ok(())
