@@ -142,6 +142,65 @@ def build_for_python(python_interpreter: str, python_version: str) -> Path | Non
     return None
 
 
+
+
+def build_test_for_python(python_interpreter: str, python_version: str) -> Path | None:
+    """Build the test-config extension for a specific Python version.
+
+    Temporarily changes the crate name to lean_multisig_test, builds with
+    test-config feature, then restores the original Cargo.toml.
+    """
+    print(f"\n{'='*60}")
+    print(f"Building lean_multisig_test for Python {python_version}...")
+    print(f"{'='*60}\n")
+
+    # Temporarily change crate name for test build
+    cargo_toml = CARGO_TOML.read_text()
+    test_cargo_toml = cargo_toml.replace(
+        'name = "lean_multisig"', 'name = "lean_multisig_test"'
+    )
+    CARGO_TOML.write_text(test_cargo_toml)
+
+    maturin = find_maturin()
+    cmd = [maturin, "build", "--release", "-i", python_interpreter, "--features", "test-config"]
+
+    env = os.environ.copy()
+    env["RUSTFLAGS"] = env.get("RUSTFLAGS", "") + " -C target-cpu=native"
+
+    try:
+        result = subprocess.run(cmd, env=env)
+        if result.returncode != 0:
+            print(f"Failed to build test config for Python {python_version}")
+            return None
+
+        # Find and extract the test .so
+        version_tag = python_version.replace(".", "")
+        wheels = sorted(
+            [w for w in WHEELS_DIR.glob("*.whl") if f"cp{version_tag}" in w.name],
+            key=lambda p: p.stat().st_mtime
+        )
+        if not wheels:
+            print(f"No wheel found for test config Python {python_version}!")
+            return None
+
+        wheel = wheels[-1]
+        ext = get_so_extension_for_version(python_version)
+        so_dest = PACKAGE_DIR / f"lean_multisig_test{ext}"
+
+        with zipfile.ZipFile(wheel, "r") as zf:
+            for name in zf.namelist():
+                if ".cpython-" in name or ".cp" in name:
+                    if name.endswith(".so") or name.endswith(".pyd"):
+                        so_dest.write_bytes(zf.read(name))
+                        print(f"Extracted: {so_dest}")
+                        return so_dest
+
+        print(f"Could not find .so file in test wheel for Python {python_version}")
+        return None
+    finally:
+        # Restore original Cargo.toml
+        CARGO_TOML.write_text(cargo_toml)
+
 def create_combined_wheel():
     """Create a wheel containing all .so variants."""
     so_files = list(PACKAGE_DIR.glob("lean_multisig*.so")) + list(PACKAGE_DIR.glob("lean_multisig*.pyd"))
@@ -228,6 +287,13 @@ def main():
             built_files.append(result)
         else:
             failed_builds.append(f"lean_multisig (Python {version})")
+
+        # Also build test config
+        test_result = build_test_for_python(interpreter, version)
+        if test_result:
+            built_files.append(test_result)
+        else:
+            failed_builds.append(f"lean_multisig_test (Python {version})")
 
     # Summary
     print("\n" + "=" * 60)
