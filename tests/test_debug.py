@@ -80,8 +80,9 @@ def test_verify_signatures_validation():
     # Test message_hash length validation
     with pytest.raises(ValueError, match="message_hash must be exactly"):
         lm.verify_aggregated_signatures(
-            b"short",  # Not 32 bytes
+            [b"short"],  # Not 32 bytes
             b"agg_sig",
+            [],
             1,
         )
 

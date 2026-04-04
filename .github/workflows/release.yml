@@ -39,6 +39,11 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
+      - name: Patch Cargo.toml for test builds
+        if: matrix.config == 'test'
+        run: |
+          sed -i.bak '/^\[lib\]/,/^\[/{s/^name = "lean_multisig"/name = "lean_multisig_test"/;}' Cargo.toml
+
       - name: Build wheel
         run: |
           if [ "${{ matrix.config }}" = "test" ]; then
@@ -47,31 +52,33 @@ jobs:
             maturin build --release -i python${{ matrix.python-version }}
           fi
 
+      - name: Restore Cargo.toml
+        if: matrix.config == 'test'
+        run: mv Cargo.toml.bak Cargo.toml
+
       - name: Extract .so from wheel
         run: |
           PYVER="${{ matrix.python-version }}"
           PYVER_SHORT="${PYVER//./}"
           CONFIG="${{ matrix.config }}"
+          LIB_NAME="lean_multisig"
+          [ "$CONFIG" = "test" ] && LIB_NAME="lean_multisig_test"
+
           WHEEL=$(ls -t target/wheels/*cp${PYVER_SHORT}*.whl | head -1)
           echo "Built wheel: $WHEEL"
 
           mkdir -p extracted
           python -m zipfile -e "$WHEEL" extracted/
-          SO=$(find extracted -name "*.so" -type f | head -1)
 
-          if [ "$CONFIG" = "test" ]; then
-            DEST="${PACKAGE_NAME}/lean_multisig_test.cpython-${PYVER_SHORT}-darwin.so"
-          else
-            DEST="${PACKAGE_NAME}/lean_multisig.cpython-${PYVER_SHORT}-darwin.so"
+          # Match the correct .so by lib name to avoid picking up bundled deps
+          SO=$(find extracted -name "${LIB_NAME}.cpython-*.so" -type f | head -1)
+          if [ -z "$SO" ]; then
+            SO=$(find extracted -name "*.so" -type f | head -1)
           fi
+
+          DEST="${PACKAGE_NAME}/${LIB_NAME}.cpython-${PYVER_SHORT}-darwin.so"
           cp "$SO" "$DEST"
           echo "Extracted: $DEST ($(du -h "$DEST" | cut -f1))"
-
-      - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-macos-arm64-${{ matrix.config }}-py${{ matrix.python-version }}
-          path: target/wheels/*.whl
 
       - name: Upload .so artifact
         uses: actions/upload-artifact@v4
@@ -99,6 +106,11 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
+      - name: Patch Cargo.toml for test builds
+        if: matrix.config == 'test'
+        run: |
+          sed -i.bak '/^\[lib\]/,/^\[/{s/^name = "lean_multisig"/name = "lean_multisig_test"/;}' Cargo.toml
+
       - name: Build wheel
         run: |
           if [ "${{ matrix.config }}" = "test" ]; then
@@ -107,31 +119,32 @@ jobs:
             maturin build --release -i python${{ matrix.python-version }}
           fi
 
+      - name: Restore Cargo.toml
+        if: matrix.config == 'test'
+        run: mv Cargo.toml.bak Cargo.toml
+
       - name: Extract .so from wheel
         run: |
           PYVER="${{ matrix.python-version }}"
           PYVER_SHORT="${PYVER//./}"
           CONFIG="${{ matrix.config }}"
+          LIB_NAME="lean_multisig"
+          [ "$CONFIG" = "test" ] && LIB_NAME="lean_multisig_test"
+
           WHEEL=$(ls -t target/wheels/*cp${PYVER_SHORT}*.whl | head -1)
           echo "Built wheel: $WHEEL"
 
           mkdir -p extracted
           python -m zipfile -e "$WHEEL" extracted/
-          SO=$(find extracted -name "*.so" -type f | head -1)
 
-          if [ "$CONFIG" = "test" ]; then
-            DEST="${PACKAGE_NAME}/lean_multisig_test.cpython-${PYVER_SHORT}-x86_64-linux-gnu.so"
-          else
-            DEST="${PACKAGE_NAME}/lean_multisig.cpython-${PYVER_SHORT}-x86_64-linux-gnu.so"
+          SO=$(find extracted -name "${LIB_NAME}.cpython-*.so" -type f | head -1)
+          if [ -z "$SO" ]; then
+            SO=$(find extracted -name "*.so" -type f | head -1)
           fi
+
+          DEST="${PACKAGE_NAME}/${LIB_NAME}.cpython-${PYVER_SHORT}-x86_64-linux-gnu.so"
           cp "$SO" "$DEST"
           echo "Extracted: $DEST ($(du -h "$DEST" | cut -f1))"
-
-      - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-linux-x86_64-${{ matrix.config }}-py${{ matrix.python-version }}
-          path: target/wheels/*.whl
 
       - name: Upload .so artifact
         uses: actions/upload-artifact@v4
@@ -143,24 +156,6 @@ jobs:
     needs: [build-macos-arm64, build-linux-x86_64]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Build sdist
-        run: |
-          pip install maturin
-          maturin sdist --out dist/
-
-      - name: Download all wheel artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: wheel-*
-          path: dist/
-          merge-multiple: true
-
       - name: Download all .so artifacts
         uses: actions/download-artifact@v4
         with:
@@ -168,18 +163,15 @@ jobs:
           path: so-files/
           merge-multiple: true
 
-      - name: List dist contents
+      - name: List .so files
         run: |
-          ls -lh dist/
+          echo "All .so files:"
           ls -lh so-files/
+          echo ""
+          echo "MD5 checksums (prod vs test should differ):"
+          md5sum so-files/*.so || true
 
-      - name: Upload dist artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Upload so-files artifacts
+      - name: Upload combined so-files
         uses: actions/upload-artifact@v4
         with:
           name: so-files
@@ -190,12 +182,6 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag != ''
     steps:
-      - name: Download dist
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
       - name: Download so-files
         uses: actions/download-artifact@v4
         with:
@@ -217,6 +203,4 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
-          files: |
-            dist/*
-            so-files/*.so
+          files: so-files/*.so
