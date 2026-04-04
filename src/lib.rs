@@ -1,6 +1,6 @@
 use backend::{precompute_dft_twiddles, KoalaBear};
 use rec_aggregation::{
-    init_aggregation_bytecode, xmss_aggregate, xmss_verify_aggregation, AggregatedXMSS,
+    init_aggregation_bytecode_from_dir, xmss_aggregate, xmss_verify_aggregation, AggregatedXMSS,
 };
 use leansig_wrapper::{
     xmss_public_key_from_ssz, xmss_signature_from_ssz, XmssPublicKey, XmssSignature,
@@ -82,67 +82,44 @@ impl Devnet4XmssAggregateSignature {
     }
 }
 
-/// Ensure the .py source files exist at the CARGO_MANIFEST_DIR path that
-/// rec_aggregation's `init_aggregation_bytecode()` reads at runtime to compute
-/// a source fingerprint. On a different machine the build-time path won't exist,
-/// so we recreate it from embedded copies.
-///
-/// The upstream `load_or_compile()` does:
-///   1. `read_dir(CARGO_MANIFEST_DIR)` to hash all .py files → fingerprint
-///   2. Compare fingerprint to the one in the embedded `cached_bytecode*.bin`
-///   3. If match → deserialize cached bytecode (fast path, no disk write)
-///   4. If mismatch → recompile from source and write new cache file
-///
-/// We need the .py files at exactly the baked-in path so step 1 succeeds and
-/// step 2 matches (avoiding step 4 which may fail with PermissionDenied).
-fn ensure_py_sources() {
+/// Extract embedded .py source files to a writable directory and return its path.
+/// The lean compiler reads main.py (and its imports) from disk at runtime.
+/// When the .so runs on a different machine than where it was built, the original
+/// build-time path is not available, so we extract to a temp directory instead.
+fn ensure_py_sources() -> &'static std::path::Path {
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
+    use std::sync::OnceLock;
 
-    let dir = Path::new(REC_AGGREGATION_MANIFEST_DIR);
-    if dir.join("main.py").exists() {
-        return;
-    }
+    static SOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
+    SOURCE_DIR.get_or_init(|| {
+        // Try the original build-time path first (works on the build machine).
+        let build_dir = Path::new(REC_AGGREGATION_MANIFEST_DIR);
+        if build_dir.join("main.py").exists() {
+            return build_dir.to_path_buf();
+        }
 
-    // Try to create the exact build-time path.
-    // On CI this may be e.g. /root/.cargo/git/checkouts/... which should be
-    // writable if we're running as the same user that built the .so.
-    if fs::create_dir_all(dir).is_err() {
-        // If we truly can't create the dir (e.g. read-only filesystem),
-        // try writing to a temp location and symlinking.
-        let tmp = std::env::temp_dir().join("lean_multisig_rec_agg_sources");
-        fs::create_dir_all(&tmp).expect("Failed to create temp dir for .py sources");
-        for (name, content) in EMBEDDED_PY_FILES {
-            fs::write(tmp.join(name), content)
-                .expect("Failed to write embedded .py source to temp dir");
-        }
-        // Create parent dirs up to (but not including) the target, then symlink.
-        if let Some(parent) = dir.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        // Try symlink; if even that fails, we'll panic with a clear message
-        // in init_aggregation_bytecode().
-        #[cfg(unix)]
-        {
-            let _ = std::os::unix::fs::symlink(&tmp, dir);
-        }
-        return;
-    }
-
+    // Extract embedded files to a temp directory.
+    let dir = std::env::temp_dir().join("lean_multisig_py_sources");
+    fs::create_dir_all(&dir).unwrap_or_else(|e| {
+        panic!("Failed to create temp directory '{}': {}", dir.display(), e)
+    });
     for (name, content) in EMBEDDED_PY_FILES {
         let path = dir.join(name);
         fs::write(&path, content).unwrap_or_else(|e| {
-            panic!("Failed to write '{}': {}", path.display(), e)
+            panic!("Failed to write embedded source '{}': {}", path.display(), e)
         });
     }
+    dir
+    })
 }
 
 /// Setup the prover for XMSS aggregation.
 /// Call this once before first aggregation to avoid slowdown.
 #[pyfunction]
 fn setup_prover() {
-    ensure_py_sources();
-    init_aggregation_bytecode();
+    let dir = ensure_py_sources();
+    init_aggregation_bytecode_from_dir(dir);
     precompute_dft_twiddles::<KoalaBear>(1 << 24);
 }
 
@@ -150,8 +127,8 @@ fn setup_prover() {
 /// Call this once before first verification to avoid slowdown.
 #[pyfunction]
 fn setup_verifier() {
-    ensure_py_sources();
-    init_aggregation_bytecode();
+    let dir = ensure_py_sources();
+    init_aggregation_bytecode_from_dir(dir);
 }
 
 /// Aggregate XMSS signatures.
