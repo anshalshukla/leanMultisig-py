@@ -86,33 +86,55 @@ impl Devnet4XmssAggregateSignature {
 /// rec_aggregation's `init_aggregation_bytecode()` reads at runtime to compute
 /// a source fingerprint. On a different machine the build-time path won't exist,
 /// so we recreate it from embedded copies.
+///
+/// The upstream `load_or_compile()` does:
+///   1. `read_dir(CARGO_MANIFEST_DIR)` to hash all .py files → fingerprint
+///   2. Compare fingerprint to the one in the embedded `cached_bytecode*.bin`
+///   3. If match → deserialize cached bytecode (fast path, no disk write)
+///   4. If mismatch → recompile from source and write new cache file
+///
+/// We need the .py files at exactly the baked-in path so step 1 succeeds and
+/// step 2 matches (avoiding step 4 which may fail with PermissionDenied).
 fn ensure_py_sources() {
     use std::fs;
     use std::path::Path;
-    use std::sync::Once;
 
-    static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        let dir = Path::new(REC_AGGREGATION_MANIFEST_DIR);
-        // If the directory already has main.py, nothing to do (build machine).
-        if dir.join("main.py").exists() {
-            return;
-        }
-        // Create the directory and write embedded .py files.
-        fs::create_dir_all(dir).unwrap_or_else(|e| {
-            panic!(
-                "Failed to create rec_aggregation source dir '{}': {}",
-                dir.display(),
-                e
-            )
-        });
+    let dir = Path::new(REC_AGGREGATION_MANIFEST_DIR);
+    if dir.join("main.py").exists() {
+        return;
+    }
+
+    // Try to create the exact build-time path.
+    // On CI this may be e.g. /root/.cargo/git/checkouts/... which should be
+    // writable if we're running as the same user that built the .so.
+    if fs::create_dir_all(dir).is_err() {
+        // If we truly can't create the dir (e.g. read-only filesystem),
+        // try writing to a temp location and symlinking.
+        let tmp = std::env::temp_dir().join("lean_multisig_rec_agg_sources");
+        fs::create_dir_all(&tmp).expect("Failed to create temp dir for .py sources");
         for (name, content) in EMBEDDED_PY_FILES {
-            let path = dir.join(name);
-            fs::write(&path, content).unwrap_or_else(|e| {
-                panic!("Failed to write '{}': {}", path.display(), e)
-            });
+            fs::write(tmp.join(name), content)
+                .expect("Failed to write embedded .py source to temp dir");
         }
-    });
+        // Create parent dirs up to (but not including) the target, then symlink.
+        if let Some(parent) = dir.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        // Try symlink; if even that fails, we'll panic with a clear message
+        // in init_aggregation_bytecode().
+        #[cfg(unix)]
+        {
+            let _ = std::os::unix::fs::symlink(&tmp, dir);
+        }
+        return;
+    }
+
+    for (name, content) in EMBEDDED_PY_FILES {
+        let path = dir.join(name);
+        fs::write(&path, content).unwrap_or_else(|e| {
+            panic!("Failed to write '{}': {}", path.display(), e)
+        });
+    }
 }
 
 /// Setup the prover for XMSS aggregation.
