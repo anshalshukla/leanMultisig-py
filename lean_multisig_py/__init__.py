@@ -136,6 +136,11 @@ def type1_decompress_with_pubkeys(sig_bytes, *, mode=None):
     return _get_module(mode).type1_decompress_with_pubkeys(sig_bytes)
 
 
+def type1_compress_without_pubkeys(sig_bytes, *, mode=None):
+    """Strip pubkeys from a self-contained Type-1 blob, returning only the compact wire form."""
+    return _get_module(mode).type1_compress_without_pubkeys(sig_bytes)
+
+
 def type2_compress_with_pubkeys(pub_keys_per_component, sig_bytes, *, mode=None):
     """Re-serialize a Type-2 multi-signature with pubkeys bundled into the blob."""
     return _get_module(mode).type2_compress_with_pubkeys(pub_keys_per_component, sig_bytes)
@@ -144,6 +149,11 @@ def type2_compress_with_pubkeys(pub_keys_per_component, sig_bytes, *, mode=None)
 def type2_decompress_with_pubkeys(sig_bytes, *, mode=None):
     """Split a self-contained Type-2 blob back into (pks_per_component_ssz, no-pubkeys-blob)."""
     return _get_module(mode).type2_decompress_with_pubkeys(sig_bytes)
+
+
+def type2_compress_without_pubkeys(sig_bytes, *, mode=None):
+    """Strip pubkeys from a self-contained Type-2 blob, returning only the compact wire form."""
+    return _get_module(mode).type2_compress_without_pubkeys(sig_bytes)
 
 
 def ssz_encode_type1_signature(sig_bytes, *, mode=None):
@@ -179,8 +189,10 @@ __all__ = [
     "split_type_2_by_msg",
     "type1_compress_with_pubkeys",
     "type1_decompress_with_pubkeys",
+    "type1_compress_without_pubkeys",
     "type2_compress_with_pubkeys",
     "type2_decompress_with_pubkeys",
+    "type2_compress_without_pubkeys",
     "ssz_encode_type1_signature",
     "ssz_decode_type1_signature",
     "ssz_encode_type2_signature",

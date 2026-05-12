@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "lean-multisig-py"
-version = "0.2.0"
+version = "0.0.2"
 description = "Python bindings for lean-multisig XMSS aggregation (devnet5)"
 requires-python = ">=3.12"
 classifiers = [

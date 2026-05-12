@@ -15,7 +15,7 @@ attached to each [GitHub Release](https://github.com/anshalshukla/leanMultisig-p
 
 ```bash
 # pick the wheel matching your interpreter + platform
-pip install https://github.com/anshalshukla/leanMultisig-py/releases/download/v0.2.0/lean_multisig_py-0.2.0-cp312-cp312-macosx_11_0_arm64.whl
+pip install https://github.com/anshalshukla/leanMultisig-py/releases/download/v0.0.2/lean_multisig_py-0.0.2-cp312-cp312-macosx_11_0_arm64.whl
 ```
 
 Each wheel ships both the `lean_multisig` (prod) and `lean_multisig_test` (test-config)
@@ -88,12 +88,23 @@ converters:
 
 ```python
 # Type 1
-combined = lm.type1_compress_with_pubkeys(pks_ssz, sig_bytes)
-pks_ssz, sig_bytes = lm.type1_decompress_with_pubkeys(combined)
+combined = lm.type1_compress_with_pubkeys(pks_ssz, sig_bytes)         # bundle
+pks_ssz, sig_bytes = lm.type1_decompress_with_pubkeys(combined)       # split
+wire_only = lm.type1_compress_without_pubkeys(combined)               # strip → no-pubkeys form
 
 # Type 2
 combined = lm.type2_compress_with_pubkeys(pks_per_component, sig_bytes)
 pks_per_component, sig_bytes = lm.type2_decompress_with_pubkeys(combined)
+wire_only = lm.type2_compress_without_pubkeys(combined)
+```
+
+Typical flow if you **store bundled locally but propagate stripped on the wire**:
+
+```python
+# on disk: keep `bundled` (with pubkeys, single blob)
+wire_bytes = lm.type1_compress_without_pubkeys(bundled)               # outbound
+# … receive `(pks_ssz, wire_bytes)` from a peer …
+bundled    = lm.type1_compress_with_pubkeys(pks_ssz, wire_bytes)      # rehydrate to bundled form
 ```
 
 ### SSZ container codecs
@@ -116,8 +127,10 @@ for Type-2.
 | `split_type_2_by_msg(pks_per_component, sig_bytes, message, log_inv_rate, mode=)` | Same, selected by message. |
 | `type1_compress_with_pubkeys(pks_ssz, sig_bytes, mode=)` | Bundle pubkeys into a single Type-1 blob. |
 | `type1_decompress_with_pubkeys(sig_bytes, mode=)` | Split a self-contained Type-1 blob into `(pks_ssz, sig_bytes)`. |
+| `type1_compress_without_pubkeys(sig_bytes, mode=)` | Strip pubkeys from a self-contained Type-1 blob; returns the no-pubkeys wire form. |
 | `type2_compress_with_pubkeys(pks_per_component, sig_bytes, mode=)` | Bundle per-component pubkeys into a single Type-2 blob. |
 | `type2_decompress_with_pubkeys(sig_bytes, mode=)` | Split a self-contained Type-2 blob into `(pks_per_component, sig_bytes)`. |
+| `type2_compress_without_pubkeys(sig_bytes, mode=)` | Strip pubkeys from a self-contained Type-2 blob; returns the no-pubkeys wire form. |
 | `ssz_encode_type1_signature` / `ssz_decode_type1_signature` | Opaque SSZ wrapper for Type-1 blobs. |
 | `ssz_encode_type2_signature` / `ssz_decode_type2_signature` | Opaque SSZ wrapper for Type-2 blobs. |
 

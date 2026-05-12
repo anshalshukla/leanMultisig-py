@@ -413,6 +413,24 @@ fn type1_decompress_with_pubkeys(sig_bytes: Vec<u8>) -> PyResult<(Vec<Vec<u8>>, 
     Ok((pks_ssz, sig.compress_without_pubkeys()))
 }
 
+/// Strip the pubkeys from a self-contained Type-1 blob, returning only the
+/// compact wire form.
+///
+/// Useful when storing the bundled form locally but propagating only the
+/// no-pubkeys form over the network (recipient is assumed to know the pubkeys).
+///
+/// Args:
+///     sig_bytes: A Type-1 blob produced by `compress()` (pubkeys bundled in).
+///
+/// Returns:
+///     `no_pubkeys_bytes` — the form returned by `aggregate_type_1`'s second element.
+#[pyfunction]
+fn type1_compress_without_pubkeys(sig_bytes: Vec<u8>) -> PyResult<Vec<u8>> {
+    let sig = TypeOneMultiSignature::decompress(&sig_bytes)
+        .ok_or_else(|| PyValueError::new_err("Failed to decompress Type-1 signature"))?;
+    Ok(sig.compress_without_pubkeys())
+}
+
 /// Re-serialize a Type-2 multi-signature with pubkeys bundled into the blob.
 #[pyfunction]
 fn type2_compress_with_pubkeys(
@@ -437,6 +455,15 @@ fn type2_decompress_with_pubkeys(sig_bytes: Vec<u8>) -> PyResult<(Vec<Vec<Vec<u8
     let pks_per_component: Vec<Vec<Vec<u8>>> =
         sig.info.iter().map(|info| pks_to_ssz(&info.pubkeys)).collect();
     Ok((pks_per_component, sig.compress_without_pubkeys()))
+}
+
+/// Strip the pubkeys from a self-contained Type-2 blob, returning only the
+/// compact wire form.
+#[pyfunction]
+fn type2_compress_without_pubkeys(sig_bytes: Vec<u8>) -> PyResult<Vec<u8>> {
+    let sig = TypeTwoMultiSignature::decompress(&sig_bytes)
+        .ok_or_else(|| PyValueError::new_err("Failed to decompress Type-2 signature"))?;
+    Ok(sig.compress_without_pubkeys())
 }
 
 #[pyfunction]
@@ -480,8 +507,10 @@ fn register_functions(py_module: &Bound<'_, PyModule>) -> PyResult<()> {
     py_module.add_function(wrap_pyfunction!(py_split_type_2_by_msg, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(type1_compress_with_pubkeys, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(type1_decompress_with_pubkeys, py_module)?)?;
+    py_module.add_function(wrap_pyfunction!(type1_compress_without_pubkeys, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(type2_compress_with_pubkeys, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(type2_decompress_with_pubkeys, py_module)?)?;
+    py_module.add_function(wrap_pyfunction!(type2_compress_without_pubkeys, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(ssz_encode_type1_signature, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(ssz_decode_type1_signature, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(ssz_encode_type2_signature, py_module)?)?;
