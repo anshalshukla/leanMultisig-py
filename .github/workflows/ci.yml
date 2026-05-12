@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, devnet4]
+    branches: [main, "devnet*"]
   pull_request:
 
 env:

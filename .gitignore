@@ -6,7 +6,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-!lean_multisig_py/*.so
+*.whl
+target/wheels/
+target/wheels-test/
+dist/
 .Python
 build/
 develop-eggs/

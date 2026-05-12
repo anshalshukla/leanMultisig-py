@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.1.0). Leave empty for dry run (artifacts only, no release)."
+        description: "Tag to release as (e.g. v0.2.0-rc1). Leave empty for artifact-only dry run."
         required: false
 
 permissions:
@@ -15,17 +15,16 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  PYTHON_VERSIONS: "3.12 3.13 3.14"
-  PACKAGE_NAME: lean_multisig_py
 
 jobs:
-  build-macos-arm64:
-    runs-on: macos-14
+  build-wheels:
+    name: build py${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [macos-14, ubuntu-latest]
         python-version: ["3.12", "3.13", "3.14"]
-        config: ["prod", "test"]
     steps:
       - uses: actions/checkout@v4
 
@@ -39,154 +38,72 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
-      - name: Patch Cargo.toml for test builds
-        if: matrix.config == 'test'
-        run: |
-          sed -i.bak '/^\[lib\]/,/^\[/{s/^name = "lean_multisig"/name = "lean_multisig_test"/;}' Cargo.toml
+      # ── Prod wheel (default [lib] name = "lean_multisig") ─────────────
+      - name: Build prod wheel (macOS)
+        if: runner.os == 'macOS'
+        run: maturin build --release --out target/wheels -i python${{ matrix.python-version }}
 
-      - name: Build wheel
+      - name: Build prod wheel (Linux)
+        if: runner.os == 'Linux'
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --out target/wheels -i python${{ matrix.python-version }}
+          manylinux: auto
+
+      # ── Test wheel ([lib] name patched to "lean_multisig_test") ──────
+      - name: Patch [lib] name for test build
         run: |
-          if [ "${{ matrix.config }}" = "test" ]; then
-            maturin build --release -i python${{ matrix.python-version }} --features test-config
-          else
-            maturin build --release -i python${{ matrix.python-version }}
-          fi
+          cp Cargo.toml Cargo.toml.bak
+          sed -i.tmp '/^\[lib\]/,/^\[/{s/^name = "lean_multisig"/name = "lean_multisig_test"/;}' Cargo.toml
+          rm -f Cargo.toml.tmp
+
+      - name: Build test wheel (macOS)
+        if: runner.os == 'macOS'
+        run: maturin build --release --features test-config --out target/wheels-test -i python${{ matrix.python-version }}
+
+      - name: Build test wheel (Linux)
+        if: runner.os == 'Linux'
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --features test-config --out target/wheels-test -i python${{ matrix.python-version }}
+          manylinux: auto
 
       - name: Restore Cargo.toml
-        if: matrix.config == 'test'
-        run: mv Cargo.toml.bak Cargo.toml
-
-      - name: Extract .so from wheel
+        if: always()
         run: |
-          PYVER="${{ matrix.python-version }}"
-          PYVER_SHORT="${PYVER//./}"
-          CONFIG="${{ matrix.config }}"
-          LIB_NAME="lean_multisig"
-          [ "$CONFIG" = "test" ] && LIB_NAME="lean_multisig_test"
+          if [ -f Cargo.toml.bak ]; then mv Cargo.toml.bak Cargo.toml; fi
 
-          WHEEL=$(ls -t target/wheels/*cp${PYVER_SHORT}*.whl | head -1)
-          echo "Built wheel: $WHEEL"
-
-          mkdir -p extracted
-          python -m zipfile -e "$WHEEL" extracted/
-
-          # Match the correct .so by lib name to avoid picking up bundled deps
-          SO=$(find extracted -name "${LIB_NAME}.cpython-*.so" -type f | head -1)
-          if [ -z "$SO" ]; then
-            SO=$(find extracted -name "*.so" -type f | head -1)
-          fi
-
-          DEST="${PACKAGE_NAME}/${LIB_NAME}.cpython-${PYVER_SHORT}-darwin.so"
-          cp "$SO" "$DEST"
-          echo "Extracted: $DEST ($(du -h "$DEST" | cut -f1))"
-
-      - name: Upload .so artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: so-macos-arm64-${{ matrix.config }}-py${{ matrix.python-version }}
-          path: ${{ env.PACKAGE_NAME }}/lean_multisig*.cpython-*-darwin.so
-
-  build-linux-x86_64:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13", "3.14"]
-        config: ["prod", "test"]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-
-      - name: Install maturin
-        run: pip install maturin
-
-      - name: Patch Cargo.toml for test builds
-        if: matrix.config == 'test'
+      # ── Merge: drop the test .so into the prod wheel ─────────────────
+      - name: Merge test .so into prod wheel
         run: |
-          sed -i.bak '/^\[lib\]/,/^\[/{s/^name = "lean_multisig"/name = "lean_multisig_test"/;}' Cargo.toml
+          chmod +x scripts/merge_wheels.sh
+          PROD_WHEEL=$(ls target/wheels/*.whl | head -1)
+          TEST_WHEEL=$(ls target/wheels-test/*.whl | head -1)
+          ./scripts/merge_wheels.sh "$PROD_WHEEL" "$TEST_WHEEL"
+          echo "Final wheel contents:"
+          unzip -l "$PROD_WHEEL"
 
-      - name: Build wheel
-        run: |
-          if [ "${{ matrix.config }}" = "test" ]; then
-            maturin build --release -i python${{ matrix.python-version }} --features test-config
-          else
-            maturin build --release -i python${{ matrix.python-version }}
-          fi
-
-      - name: Restore Cargo.toml
-        if: matrix.config == 'test'
-        run: mv Cargo.toml.bak Cargo.toml
-
-      - name: Extract .so from wheel
-        run: |
-          PYVER="${{ matrix.python-version }}"
-          PYVER_SHORT="${PYVER//./}"
-          CONFIG="${{ matrix.config }}"
-          LIB_NAME="lean_multisig"
-          [ "$CONFIG" = "test" ] && LIB_NAME="lean_multisig_test"
-
-          WHEEL=$(ls -t target/wheels/*cp${PYVER_SHORT}*.whl | head -1)
-          echo "Built wheel: $WHEEL"
-
-          mkdir -p extracted
-          python -m zipfile -e "$WHEEL" extracted/
-
-          SO=$(find extracted -name "${LIB_NAME}.cpython-*.so" -type f | head -1)
-          if [ -z "$SO" ]; then
-            SO=$(find extracted -name "*.so" -type f | head -1)
-          fi
-
-          DEST="${PACKAGE_NAME}/${LIB_NAME}.cpython-${PYVER_SHORT}-x86_64-linux-gnu.so"
-          cp "$SO" "$DEST"
-          echo "Extracted: $DEST ($(du -h "$DEST" | cut -f1))"
-
-      - name: Upload .so artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: so-linux-x86_64-${{ matrix.config }}-py${{ matrix.python-version }}
-          path: ${{ env.PACKAGE_NAME }}/lean_multisig*.cpython-*-x86_64-linux-gnu.so
-
-  package:
-    needs: [build-macos-arm64, build-linux-x86_64]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all .so artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: so-*
-          path: so-files/
-          merge-multiple: true
-
-      - name: List .so files
-        run: |
-          echo "All .so files:"
-          ls -lh so-files/
-          echo ""
-          echo "MD5 checksums (prod vs test should differ):"
-          md5sum so-files/*.so || true
-
-      - name: Upload combined so-files
-        uses: actions/upload-artifact@v4
-        with:
-          name: so-files
-          path: so-files/
+          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: target/wheels/*.whl
 
   release:
-    needs: [package]
+    name: publish github release
+    needs: build-wheels
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag != ''
     steps:
-      - name: Download so-files
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: so-files
-          path: so-files/
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: List collected wheels
+        run: ls -lh dist/
 
       - name: Determine tag
         id: tag
@@ -197,10 +114,10 @@ jobs:
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
+          files: dist/*.whl
           generate_release_notes: true
-          files: so-files/*.so
+          prerelease: ${{ contains(steps.tag.outputs.tag, '-rc') }}

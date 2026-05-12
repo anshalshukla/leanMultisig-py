@@ -4,9 +4,9 @@ build-backend = "maturin"
 
 [project]
 name = "lean-multisig-py"
-version = "0.1.0"
-description = "Python bindings for lean-multisig XMSS aggregation"
-requires-python = ">=3.8"
+version = "0.2.0"
+description = "Python bindings for lean-multisig XMSS aggregation (devnet5)"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -15,6 +15,8 @@ classifiers = [
 [tool.maturin]
 python-source = "."
 module-name = "lean_multisig_py.lean_multisig"
+# In release wheels (built by build_all.sh / GH Actions), the prod build is
+# extended with the test-config .so so a single wheel ships both variants.
 include = [
     { path = "lean_multisig_py/lean_multisig_test*.so", format = "wheel" },
     { path = "lean_multisig_py/lean_multisig_test*.pyd", format = "wheel" },

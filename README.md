@@ -1,165 +1,129 @@
-# lean-multisig Python Bindings
+# lean-multisig Python Bindings (devnet5)
 
-Python bindings for XMSS signature aggregation from the lean-multisig project.
+Python bindings for XMSS multi-signature aggregation from the
+[leanMultisig](https://github.com/leanEthereum/leanMultisig) project (`devnet5`).
 
-## Features
+devnet5 splits aggregation into two layers:
 
-- `aggregate_signatures`: Aggregate multiple XMSS signatures into a single proof
-- `verify_aggregated_signatures`: Verify an aggregated signature
-- `setup_prover`: Pre-compute DFT twiddles for faster proving (optional but recommended)
-- `setup_verifier`: Pre-compute data for faster verification (optional but recommended)
+- **Type 1** — one message, one slot, many signers (raw signatures and/or prior Type-1 children).
+- **Type 2** — many components (potentially with distinct messages/slots), merged by a single SNARK.
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.8 or later
-- Rust toolchain
-- maturin (`pip install maturin`)
-
-### Build and Install
+Wheels for macOS arm64 and Linux x86_64 (Python 3.12 / 3.13 / 3.14) are
+attached to each [GitHub Release](https://github.com/anshalshukla/leanMultisig-py/releases):
 
 ```bash
-# From the leanMultisig-py directory
-pip install -e .
-# (Runs release-mode Rust builds for both prod & test modules automatically)
+# pick the wheel matching your interpreter + platform
+pip install https://github.com/anshalshukla/leanMultisig-py/releases/download/v0.2.0/lean_multisig_py-0.2.0-cp312-cp312-macosx_11_0_arm64.whl
 ```
 
-For production wheels (e.g., to publish or install elsewhere):
+Each wheel ships both the `lean_multisig` (prod) and `lean_multisig_test` (test-config)
+extension modules in one package — pick at call time with `mode="prod"` / `mode="test"`.
+
+### From source (for development)
+
 ```bash
-pip wheel .
-pip install lean_multisig_py-*.whl
+pip install maturin
+maturin develop --release                  # installs the prod module into your venv
+maturin develop --release --features test-config  # test-config build
 ```
 
-If you just want to refresh the native libraries in-place without installing,
-run `python build_native.py` (or `./build_all.sh` which wraps the same logic and
-performs an editable install).
+Or build all wheels locally (mirrors what CI does):
+
+```bash
+./build_all.sh --macos-only   # produces wheels in target/wheels/
+```
 
 ## Usage
 
-### Basic Example
+### Type 1 (single message + slot)
 
 ```python
-import lean_multisig_py
+import lean_multisig_py as lm
 
-# Optional: Setup for better performance (call once at startup)
-lean_multisig_py.setup_prover(mode="prod")     # or test_mode=True for the test config
-lean_multisig_py.setup_verifier(mode="prod")
+lm.setup_prover(mode="prod")        # call once at startup
+# lm.setup_verifier(mode="prod")    # call once before the first verify
 
-# Your serialized data (from leanSpec or other source)
-pub_keys_bytes = [...]  # List of serialized public keys (bytes)
-signatures_bytes = [...]  # List of serialized signatures (bytes)
-message_hash = b'...'  # 32-byte message hash
-epoch = 50
+pub_keys_bytes   = [...]            # list of SSZ-encoded XmssPublicKey
+signatures_bytes = [...]            # list of SSZ-encoded XmssSignature
+message_hash     = b"\x00" * 32
+slot             = 42
+log_inv_rate     = 1
 
-# Aggregate signatures (pick "prod" or "test")
-agg_sig_bytes = lean_multisig_py.aggregate_signatures(
-    pub_keys_bytes,
-    signatures_bytes,
-    message_hash,
-    epoch,
-    mode="prod",  # omit or set to "test" for the fast devnet config
+sorted_pks_ssz, type1_bytes = lm.aggregate_type_1(
+    pub_keys_bytes, signatures_bytes, message_hash, slot, log_inv_rate
 )
 
-# Verify aggregated signature
-try:
-    lean_multisig_py.verify_aggregated_signatures(
-        pub_keys_bytes,
-        message_hash,
-        agg_sig_bytes,
-        epoch,
-        mode="prod",
-    )
-    print("Verification successful!")
-except ValueError as e:
-    print(f"Verification failed: {e}")
+lm.verify_type_1(sorted_pks_ssz, message_hash, slot, type1_bytes)   # raises on failure
 ```
 
-### Selecting prod vs. test parameters
+### Type 2 (merge many Type-1s)
 
-Two Rust extension modules ship in the wheel:
+```python
+# Build several Type-1 multi-sigs (one per (message, slot) group), then merge:
+sig_a = lm.aggregate_type_1(pks_a, sigs_a, msg_a, slot, log_inv_rate)
+sig_b = lm.aggregate_type_1(pks_b, sigs_b, msg_b, slot, log_inv_rate)
 
-- `lean_multisig_py.prod` – production security parameters
-- `lean_multisig_py.test` – fast parameters useful for development
+pks_per_component, type2_bytes = lm.merge_many_type_1(
+    [sig_a, sig_b], log_inv_rate
+)
 
-You can either import the modules directly or use the convenience wrappers shown above.
-Pass `mode="prod"`/`"test"` (or the legacy `test_mode=True/False` flag used by
-`leanSpec`) to choose the config at runtime. Without an explicit flag the test module
-is used when available, matching the previous default behavior.
+lm.verify_type_2(pks_per_component, type2_bytes)
 
-## Data Format
-
-The bindings expect data to be serialized using the bincode format, which is the same format used by the Rust code.
-
-### Required Types
-
-1. **Public Keys**: Each public key must be serialized as `LeanSigPubKey` type
-2. **Signatures**: Each signature must be serialized as `LeanSigSignature` type
-3. **Message Hash**: Must be exactly 32 bytes
-4. **Epoch**: A 32-bit unsigned integer
-
-### Serialization
-
-Since you mentioned you already have ways to generate XMSS signatures from `../leanSpec`, you'll need to ensure they're serialized in bincode format before passing to these functions.
-
-If you need help with serialization, you can:
-1. Use a Python bincode library
-2. Create a simple Rust helper that serializes your Python objects
-3. Match the exact binary format that Rust's bincode produces
-
-## API Reference
-
-### `setup_prover()`
-Pre-computes DFT twiddles for faster proving. Call this once at startup before the first aggregation.
-
-### `setup_verifier()`
-Pre-computes data for faster verification. Call this once at startup before the first verification.
-
-### `aggregate_signatures(pub_keys_bytes, signatures_bytes, message_hash, epoch)`
-Aggregate multiple XMSS signatures into a single proof.
-
-**Parameters:**
-- `pub_keys_bytes` (List[bytes]): List of serialized public keys
-- `signatures_bytes` (List[bytes]): List of serialized signatures (must match length of pub_keys_bytes)
-- `message_hash` (bytes): 32-byte message hash
-- `epoch` (int): Epoch number
-
-**Returns:** bytes - Serialized aggregated signature
-
-**Raises:** ValueError if inputs are invalid or aggregation fails
-
-### `verify_aggregated_signatures(pub_keys_bytes, message_hash, agg_signature_bytes, epoch)`
-Verify an aggregated signature.
-
-**Parameters:**
-- `pub_keys_bytes` (List[bytes]): List of serialized public keys
-- `message_hash` (bytes): 32-byte message hash
-- `agg_signature_bytes` (bytes): Serialized aggregated signature
-- `epoch` (int): Epoch number
-
-**Returns:** None
-
-**Raises:** ValueError if verification fails
-
-## Development
-
-### Building in Debug Mode
-```bash
-maturin develop
+# Pull one component back out as an independent Type-1:
+pks_only_a, type1_a = lm.split_type_2(pks_per_component, type2_bytes, 0, log_inv_rate)
+# …or select by message:
+pks_only_a, type1_a = lm.split_type_2_by_msg(
+    pks_per_component, type2_bytes, msg_a, log_inv_rate
+)
 ```
 
-### Running Tests
-```bash
-# Build and install
-maturin develop --release
+### Choosing the serialization form
 
-# Run your Python tests
-python -m pytest tests/
+`aggregate_type_1`, `merge_many_type_1`, `split_type_2*` all return the **no-pubkeys**
+form `(pks_ssz, sig_bytes)` — small blob, pubkeys carried separately. To bundle the
+pubkeys into a single self-contained blob (the upstream `compress()` form), use the
+converters:
+
+```python
+# Type 1
+combined = lm.type1_compress_with_pubkeys(pks_ssz, sig_bytes)
+pks_ssz, sig_bytes = lm.type1_decompress_with_pubkeys(combined)
+
+# Type 2
+combined = lm.type2_compress_with_pubkeys(pks_per_component, sig_bytes)
+pks_per_component, sig_bytes = lm.type2_decompress_with_pubkeys(combined)
 ```
+
+### SSZ container codecs
+
+`ssz_encode_type1_signature` / `ssz_decode_type1_signature` wrap a Type-1 blob in
+the `Devnet5Type1Signature` SSZ container. Analogous `*_type2_*` helpers exist
+for Type-2.
+
+## API reference
+
+| Function | Description |
+|---|---|
+| `setup_prover(mode=)` | Compile aggregation bytecode and precompute DFT twiddles. |
+| `setup_verifier(mode=)` | Compile aggregation bytecode. |
+| `aggregate_type_1(pks, sigs, msg, slot, log_inv_rate, children=None, mode=)` | Returns `(sorted_pks_ssz, type1_bytes)`. |
+| `verify_type_1(pks, msg, slot, sig_bytes, mode=)` | Raises `ValueError` on failure. |
+| `merge_many_type_1(entries, log_inv_rate, mode=)` | `entries = [(pks_ssz, type1_bytes), …]`. Returns `(pks_per_component, type2_bytes)`. |
+| `verify_type_2(pks_per_component, sig_bytes, mode=)` | Raises on failure. |
+| `split_type_2(pks_per_component, sig_bytes, index, log_inv_rate, mode=)` | Returns `(pks_ssz, type1_bytes)`. |
+| `split_type_2_by_msg(pks_per_component, sig_bytes, message, log_inv_rate, mode=)` | Same, selected by message. |
+| `type1_compress_with_pubkeys(pks_ssz, sig_bytes, mode=)` | Bundle pubkeys into a single Type-1 blob. |
+| `type1_decompress_with_pubkeys(sig_bytes, mode=)` | Split a self-contained Type-1 blob into `(pks_ssz, sig_bytes)`. |
+| `type2_compress_with_pubkeys(pks_per_component, sig_bytes, mode=)` | Bundle per-component pubkeys into a single Type-2 blob. |
+| `type2_decompress_with_pubkeys(sig_bytes, mode=)` | Split a self-contained Type-2 blob into `(pks_per_component, sig_bytes)`. |
+| `ssz_encode_type1_signature` / `ssz_decode_type1_signature` | Opaque SSZ wrapper for Type-1 blobs. |
+| `ssz_encode_type2_signature` / `ssz_decode_type2_signature` | Opaque SSZ wrapper for Type-2 blobs. |
 
 ## Notes
 
-- The aggregation process uses SNARK proofs and can be computationally intensive
-- Using `setup_prover()` and `setup_verifier()` is optional but recommended to avoid slowdowns on the first call
-- Make sure the number of public keys matches the number of signatures
-- All serialization must use the bincode format compatible with the Rust types
+- `setup_prover` is expensive (~seconds). Call it once at process start.
+- All `pub_keys_bytes` / `signatures_bytes` must be SSZ-encoded (see `leansig_wrapper`'s `xmss_public_key_to_ssz` / `xmss_signature_to_ssz`).
+- The number of public keys must match the number of signatures in `aggregate_type_1`.
+- Mode selection: with no `mode=` argument the wrappers prefer the prod module if both are present.
