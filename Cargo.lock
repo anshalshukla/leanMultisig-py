@@ -287,7 +287,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "backend"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "mt-air",
  "mt-fiat-shamir",
@@ -1159,7 +1159,7 @@ dependencies = [
 [[package]]
 name = "lean_compiler"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "backend",
  "include_dir",
@@ -1175,7 +1175,7 @@ dependencies = [
 [[package]]
 name = "lean_prover"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "backend",
  "itertools 0.14.0",
@@ -1193,7 +1193,7 @@ dependencies = [
 [[package]]
 name = "lean_vm"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "backend",
  "itertools 0.14.0",
@@ -1209,7 +1209,7 @@ dependencies = [
 [[package]]
 name = "leansig"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanSig?branch=devnet4#5cc7e37480362f94e86695428a9ceb9a96b66b97"
+source = "git+https://github.com/leanEthereum/leanSig?branch=devnet4#15cbdd43ec8525aa43fea2f42cafc5ed366084ae"
 dependencies = [
  "dashmap",
  "ethereum_ssz",
@@ -1229,7 +1229,7 @@ dependencies = [
 [[package]]
 name = "leansig_fast_keygen"
 version = "0.1.0"
-source = "git+https://github.com/TomWambsgans/leanSig?branch=devnet4-fast-keygen#5b86867a4d3c1d4a8add840f70fa047ea1506188"
+source = "git+https://github.com/TomWambsgans/leanSig?branch=devnet4-fast-keygen#0fa9e19b8946ef50a34f3d50d82918b98bcfa4a5"
 dependencies = [
  "dashmap",
  "ethereum_ssz",
@@ -1249,7 +1249,7 @@ dependencies = [
 [[package]]
 name = "leansig_wrapper"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "backend",
  "ethereum_ssz",
@@ -1334,7 +1334,7 @@ dependencies = [
 [[package]]
 name = "mt-air"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "mt-field",
  "mt-poly",
@@ -1343,7 +1343,7 @@ dependencies = [
 [[package]]
 name = "mt-fiat-shamir"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "mt-field",
  "mt-koala-bear",
@@ -1357,7 +1357,7 @@ dependencies = [
 [[package]]
 name = "mt-field"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "itertools 0.14.0",
  "mt-utils",
@@ -1372,7 +1372,7 @@ dependencies = [
 [[package]]
 name = "mt-koala-bear"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "itertools 0.14.0",
  "mt-field",
@@ -1388,7 +1388,7 @@ dependencies = [
 [[package]]
 name = "mt-poly"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "itertools 0.14.0",
  "mt-field",
@@ -1402,7 +1402,7 @@ dependencies = [
 [[package]]
 name = "mt-sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "mt-air",
  "mt-fiat-shamir",
@@ -1415,7 +1415,7 @@ dependencies = [
 [[package]]
 name = "mt-symetric"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "mt-field",
  "mt-koala-bear",
@@ -1425,7 +1425,7 @@ dependencies = [
 [[package]]
 name = "mt-utils"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "serde",
 ]
@@ -1433,7 +1433,7 @@ dependencies = [
 [[package]]
 name = "mt-whir"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "itertools 0.14.0",
  "mt-fiat-shamir",
@@ -1521,7 +1521,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 [[package]]
 name = "p3-baby-bear"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "p3-challenger",
  "p3-field",
@@ -1536,7 +1536,7 @@ dependencies = [
 [[package]]
 name = "p3-challenger"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "p3-field",
  "p3-maybe-rayon",
@@ -1549,7 +1549,7 @@ dependencies = [
 [[package]]
 name = "p3-dft"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1563,7 +1563,7 @@ dependencies = [
 [[package]]
 name = "p3-field"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "itertools 0.14.0",
  "num-bigint",
@@ -1578,7 +1578,7 @@ dependencies = [
 [[package]]
 name = "p3-koala-bear"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "p3-challenger",
  "p3-field",
@@ -1593,7 +1593,7 @@ dependencies = [
 [[package]]
 name = "p3-matrix"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1607,12 +1607,12 @@ dependencies = [
 [[package]]
 name = "p3-maybe-rayon"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 
 [[package]]
 name = "p3-mds"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "p3-dft",
  "p3-field",
@@ -1624,7 +1624,7 @@ dependencies = [
 [[package]]
 name = "p3-monty-31"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "itertools 0.14.0",
  "num-bigint",
@@ -1647,7 +1647,7 @@ dependencies = [
 [[package]]
 name = "p3-poseidon1"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "p3-field",
  "p3-symmetric",
@@ -1657,7 +1657,7 @@ dependencies = [
 [[package]]
 name = "p3-poseidon2"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "p3-field",
  "p3-mds",
@@ -1669,7 +1669,7 @@ dependencies = [
 [[package]]
 name = "p3-symmetric"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1680,7 +1680,7 @@ dependencies = [
 [[package]]
 name = "p3-util"
 version = "0.5.1"
-source = "git+https://github.com/Plonky3/Plonky3.git#6a62ee0712243b966ade30e4761b533b1dc17bc5"
+source = "git+https://github.com/Plonky3/Plonky3.git#af65376f7e86a683746dd9306377ab347d4c335d"
 dependencies = [
  "serde",
  "transpose",
@@ -2091,7 +2091,7 @@ dependencies = [
 [[package]]
 name = "rec_aggregation"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "backend",
  "include_dir",
@@ -2461,7 +2461,7 @@ checksum = "fe895eb47f22e2ddd4dabc02bce419d2e643c8e3b585c78158b349195bc24d82"
 [[package]]
 name = "sub_protocols"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "backend",
  "lean_vm",
@@ -2500,7 +2500,7 @@ dependencies = [
 [[package]]
 name = "system-info"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "libc",
  "rayon",
@@ -2737,7 +2737,7 @@ checksum = "7264e107f553ccae879d21fbea1d6724ac785e8c3bfc762137959b5802826ef3"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "backend",
  "tracing",
@@ -3010,7 +3010,7 @@ dependencies = [
 [[package]]
 name = "zk-alloc"
 version = "0.1.0"
-source = "git+https://github.com/leanEthereum/leanMultisig?branch=devnet5#0242c909260c9e16893baae3004667230429808d"
+source = "git+https://github.com/anshalshukla/leanMultisig?branch=devnet5-patched#f33a0775e4f88ec8b23b2cb8282a4472c145fb93"
 dependencies = [
  "libc",
  "system-info",
