@@ -46,6 +46,11 @@ jobs:
       - name: Build prod wheel (Linux)
         if: runner.os == 'Linux'
         uses: PyO3/maturin-action@v1
+        env:
+          # Upstream's `no_packing` codepath (default x86-64 baseline) has a bug
+          # in `as_constant` that panics with `unreachable!()`. Force the AVX2
+          # packing path. x86-64-v3 = Haswell+ (2013), AMD Excavator+ (2015).
+          RUSTFLAGS: "-C target-cpu=x86-64-v3"
         with:
           command: build
           args: --release --out target/wheels -i python${{ matrix.python-version }}
@@ -65,6 +70,8 @@ jobs:
       - name: Build test wheel (Linux)
         if: runner.os == 'Linux'
         uses: PyO3/maturin-action@v1
+        env:
+          RUSTFLAGS: "-C target-cpu=x86-64-v3"
         with:
           command: build
           args: --release --features test-config --out target/wheels-test -i python${{ matrix.python-version }}

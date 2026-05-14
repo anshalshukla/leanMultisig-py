@@ -179,6 +179,7 @@ build_cell() {
     else
         docker run --rm --platform linux/amd64 \
             --entrypoint bash \
+            -e RUSTFLAGS="-C target-cpu=x86-64-v3" \
             -v "$SCRIPT_DIR":/io -w /io \
             ghcr.io/pyo3/maturin:latest \
             -c "rm -rf target/release/.fingerprint/lean-multisig-py-* target/release/.fingerprint/leansig_wrapper-* target/release/.fingerprint/rec_aggregation-* target/release/deps/liblean_multisig* target/release/deps/libleansig_wrapper* target/release/deps/librec_aggregation* 2>/dev/null; maturin build --release -i python$PYVER" 2>&1 \
@@ -205,6 +206,7 @@ build_cell() {
     else
         docker run --rm --platform linux/amd64 \
             --entrypoint bash \
+            -e RUSTFLAGS="-C target-cpu=x86-64-v3" \
             -v "$SCRIPT_DIR":/io -w /io \
             ghcr.io/pyo3/maturin:latest \
             -c "rm -rf target/release/.fingerprint/lean-multisig-py-* target/release/.fingerprint/leansig_wrapper-* target/release/.fingerprint/rec_aggregation-* target/release/deps/liblean_multisig* target/release/deps/libleansig_wrapper* target/release/deps/librec_aggregation* 2>/dev/null; maturin build --release --features test-config -i python$PYVER --out target/wheels-test" 2>&1 \
