@@ -47,3 +47,6 @@ env/
 
 # Claude
 .claude/
+
+# ASDF Config
+.tool-versions

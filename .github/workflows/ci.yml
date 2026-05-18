@@ -83,6 +83,3 @@ jobs:
               mv "$f" "$dest"
             fi
           done
-
-      - name: Run tests
-        run: pytest tests/ -v

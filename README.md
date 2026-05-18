@@ -15,7 +15,7 @@ attached to each [GitHub Release](https://github.com/anshalshukla/leanMultisig-p
 
 ```bash
 # pick the wheel matching your interpreter + platform
-pip install https://github.com/anshalshukla/leanMultisig-py/releases/download/v0.0.2/lean_multisig_py-0.0.2-cp312-cp312-macosx_11_0_arm64.whl
+pip install https://github.com/anshalshukla/leanMultisig-py/releases/download/v0.0.5/lean_multisig_py-0.0.5-cp312-cp312-macosx_11_0_arm64.whl
 ```
 
 Each wheel ships both the `lean_multisig` (prod) and `lean_multisig_test` (test-config)
@@ -29,11 +29,16 @@ maturin develop --release                  # installs the prod module into your 
 maturin develop --release --features test-config  # test-config build
 ```
 
-Or build all wheels locally (mirrors what CI does):
+Or build a release wheel locally with maturin directly:
 
 ```bash
-./build_all.sh --macos-only   # produces wheels in target/wheels/
+maturin build --release --out target/wheels             # prod module
+maturin build --release --features test-config --out target/wheels-test
 ```
+
+Release wheels (both modules merged into one, for all supported
+platforms/interpreters) are produced by the `release.yml` GitHub Actions
+workflow — there is no longer a local `build_all.sh`.
 
 ## Usage
 

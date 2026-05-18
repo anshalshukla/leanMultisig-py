@@ -5,7 +5,7 @@ backend-path = ["."]
 
 [project]
 name = "lean-multisig-py"
-version = "0.0.3"
+version = "0.0.5"
 description = "Python bindings for lean-multisig XMSS aggregation (devnet5)"
 requires-python = ">=3.12"
 classifiers = [
@@ -16,7 +16,7 @@ classifiers = [
 [tool.maturin]
 python-source = "."
 module-name = "lean_multisig_py.lean_multisig"
-# In release wheels (built by build_all.sh / GH Actions), the prod build is
+# In release wheels (built by the release.yml GH Actions workflow), the prod build is
 # extended with the test-config .so so a single wheel ships both variants.
 include = [
     { path = "lean_multisig_py/lean_multisig_test*.so", format = "wheel" },
