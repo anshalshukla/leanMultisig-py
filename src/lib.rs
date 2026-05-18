@@ -305,6 +305,76 @@ fn py_verify_type_2(
     Ok(())
 }
 
+/// Verify a Type-2 multi-signature and bind each component to an expected
+/// (message_hash, slot) pair.
+///
+/// Like `verify_type_2`, but additionally checks that component `i` of the
+/// signature attests to `expected_messages[i]`. The order of
+/// `expected_messages` must match the order of `pub_keys_per_component`.
+///
+/// Args:
+///     pub_keys_per_component: List of SSZ-encoded pubkey lists, one per component.
+///     expected_messages: List of `(message_hash, slot)` tuples, one per component,
+///         where `message_hash` is exactly 32 bytes and `slot` is a u32.
+///     sig_bytes: Type-2 signature bytes (compressed without pubkeys).
+///
+/// Raises:
+///     ValueError if the SNARK fails, the component count mismatches, or any
+///     component's (message, slot) does not match the expected pair.
+#[pyfunction(name = "verify_type_2_with_messages")]
+fn py_verify_type_2_with_messages(
+    pub_keys_per_component: Vec<Vec<Vec<u8>>>,
+    expected_messages: Vec<(Vec<u8>, u32)>,
+    sig_bytes: Vec<u8>,
+) -> PyResult<()> {
+    if pub_keys_per_component.len() != expected_messages.len() {
+        return Err(PyValueError::new_err(format!(
+            "Number of pubkey-lists ({}) must match number of expected messages ({})",
+            pub_keys_per_component.len(),
+            expected_messages.len()
+        )));
+    }
+
+    let expected: Vec<([u8; MESSAGE_LENGTH], u32)> = expected_messages
+        .into_iter()
+        .map(|(msg, slot)| Ok((message_to_array(msg)?, slot)))
+        .collect::<PyResult<_>>()?;
+
+    let pks_per_component: Vec<Vec<XmssPublicKey>> = pub_keys_per_component
+        .iter()
+        .enumerate()
+        .map(|(i, pks_bytes)| deserialize_pub_keys(pks_bytes, &format!("component {i}")))
+        .collect::<PyResult<_>>()?;
+
+    let sig = TypeTwoMultiSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
+        .ok_or_else(|| PyValueError::new_err("Failed to decompress Type-2 signature"))?;
+
+    if sig.info.len() != expected.len() {
+        return Err(PyValueError::new_err(format!(
+            "Signature has {} components but {} expected messages were given",
+            sig.info.len(),
+            expected.len()
+        )));
+    }
+
+    for (i, (info, (exp_msg, exp_slot))) in sig.info.iter().zip(&expected).enumerate() {
+        if info.without_pubkeys.message != *exp_msg {
+            return Err(PyValueError::new_err(format!(
+                "Component {i}: message_hash does not match signature"
+            )));
+        }
+        if info.without_pubkeys.slot != *exp_slot {
+            return Err(PyValueError::new_err(format!(
+                "Component {i}: slot does not match signature (expected {}, got {})",
+                exp_slot, info.without_pubkeys.slot
+            )));
+        }
+    }
+
+    verify_type_2(&sig).map_err(|e| PyValueError::new_err(format!("Verification failed: {e:?}")))?;
+    Ok(())
+}
+
 /// Recover an independent Type-1 multi-signature for the component at `index` from a Type-2.
 ///
 /// Args:
@@ -503,6 +573,7 @@ fn register_functions(py_module: &Bound<'_, PyModule>) -> PyResult<()> {
     py_module.add_function(wrap_pyfunction!(py_verify_type_1, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(py_merge_many_type_1, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(py_verify_type_2, py_module)?)?;
+    py_module.add_function(wrap_pyfunction!(py_verify_type_2_with_messages, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(py_split_type_2, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(py_split_type_2_by_msg, py_module)?)?;
     py_module.add_function(wrap_pyfunction!(type1_compress_with_pubkeys, py_module)?)?;

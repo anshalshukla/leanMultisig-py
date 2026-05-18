@@ -110,6 +110,27 @@ def verify_type_2(pub_keys_per_component, sig_bytes, *, mode=None):
     return _get_module(mode).verify_type_2(pub_keys_per_component, sig_bytes)
 
 
+def verify_type_2_with_messages(
+    pub_keys_per_component, expected_messages, sig_bytes, *, mode=None
+):
+    """Verify a Type-2 multi-signature and bind each component to a (message_hash, slot).
+
+    Args:
+        pub_keys_per_component: List of SSZ-encoded pubkey lists, one per component.
+        expected_messages: List of `(message_hash, slot)` tuples, one per component,
+            in the same order as `pub_keys_per_component`. `message_hash` is 32 bytes.
+        sig_bytes: Type-2 signature bytes (compressed without pubkeys).
+        mode: 'prod', 'test', or None.
+
+    Raises:
+        ValueError if the SNARK fails, the component count mismatches, or any
+        component's (message, slot) does not match the expected pair.
+    """
+    return _get_module(mode).verify_type_2_with_messages(
+        pub_keys_per_component, expected_messages, sig_bytes
+    )
+
+
 def split_type_2(pub_keys_per_component, sig_bytes, index, log_inv_rate, *, mode=None):
     """Extract component `index` from a Type-2 multi-signature as an independent Type-1."""
     return _get_module(mode).split_type_2(pub_keys_per_component, sig_bytes, index, log_inv_rate)
@@ -185,6 +206,7 @@ __all__ = [
     "verify_type_1",
     "merge_many_type_1",
     "verify_type_2",
+    "verify_type_2_with_messages",
     "split_type_2",
     "split_type_2_by_msg",
     "type1_compress_with_pubkeys",

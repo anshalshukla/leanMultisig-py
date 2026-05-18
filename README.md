@@ -128,6 +128,7 @@ for Type-2.
 | `verify_type_1(pks, msg, slot, sig_bytes, mode=)` | Raises `ValueError` on failure. |
 | `merge_many_type_1(entries, log_inv_rate, mode=)` | `entries = [(pks_ssz, type1_bytes), …]`. Returns `(pks_per_component, type2_bytes)`. |
 | `verify_type_2(pks_per_component, sig_bytes, mode=)` | Raises on failure. |
+| `verify_type_2_with_messages(pks_per_component, expected_messages, sig_bytes, mode=)` | Like `verify_type_2`, but also binds each component to an expected `(message_hash, slot)`. |
 | `split_type_2(pks_per_component, sig_bytes, index, log_inv_rate, mode=)` | Returns `(pks_ssz, type1_bytes)`. |
 | `split_type_2_by_msg(pks_per_component, sig_bytes, message, log_inv_rate, mode=)` | Same, selected by message. |
 | `type1_compress_with_pubkeys(pks_ssz, sig_bytes, mode=)` | Bundle pubkeys into a single Type-1 blob. |
