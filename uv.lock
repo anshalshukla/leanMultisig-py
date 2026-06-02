@@ -4,5 +4,5 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "lean-multisig-py"
-version = "0.0.5"
+version = "0.0.6"
 source = { editable = "." }

@@ -12,9 +12,9 @@ test-config = ["rec_aggregation/test-config", "leansig_wrapper/test-config"]
 
 [dependencies]
 pyo3 = { version = "0.27", features = ["extension-module"] }
-rec_aggregation = { git = "https://github.com/anshalshukla/leanMultisig", branch = "devnet5-patched" }
-backend = { git = "https://github.com/anshalshukla/leanMultisig", branch = "devnet5-patched" }
-leansig_wrapper = { git = "https://github.com/anshalshukla/leanMultisig", branch = "devnet5-patched" }
+rec_aggregation = { git = "https://github.com/leanEthereum/leanMultisig", branch = "devnet5" }
+backend = { git = "https://github.com/leanEthereum/leanMultisig", branch = "devnet5" }
+leansig_wrapper = { git = "https://github.com/leanEthereum/leanMultisig", branch = "devnet5" }
 postcard = { version = "1.1.3", features = ["alloc"] }
 serde = { version = "1.0", features = ["derive"] }
 ssz = { package = "ethereum_ssz", version = "0.10.0" }
