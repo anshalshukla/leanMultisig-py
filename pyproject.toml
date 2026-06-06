@@ -5,7 +5,7 @@ backend-path = ["."]
 
 [project]
 name = "lean-multisig-py"
-version = "0.0.6"
+version = "0.0.8"
 description = "Python bindings for lean-multisig XMSS aggregation (devnet5)"
 requires-python = ">=3.12"
 classifiers = [

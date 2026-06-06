@@ -5,8 +5,8 @@ Python bindings for XMSS multi-signature aggregation from the
 
 devnet5 splits aggregation into two layers:
 
-- **Type 1** — one message, one slot, many signers (raw signatures and/or prior Type-1 children).
-- **Type 2** — many components (potentially with distinct messages/slots), merged by a single SNARK.
+- **Single-message proof** — one message, one slot, many signers (raw signatures and/or prior single-message proof children).
+- **Multi-message proof** — many components (potentially with distinct messages/slots), merged by a single SNARK.
 
 ## Installation
 
@@ -42,7 +42,7 @@ workflow — there is no longer a local `build_all.sh`.
 
 ## Usage
 
-### Type 1 (single message + slot)
+### Single-message proof (single message + slot)
 
 ```python
 import lean_multisig_py as lm
@@ -56,67 +56,67 @@ message_hash     = b"\x00" * 32
 slot             = 42
 log_inv_rate     = 1
 
-sorted_pks_ssz, type1_bytes = lm.aggregate_type_1(
+sorted_pks_ssz, single_message_proof_bytes = lm.aggregate_single_message(
     pub_keys_bytes, signatures_bytes, message_hash, slot, log_inv_rate
 )
 
-lm.verify_type_1(sorted_pks_ssz, message_hash, slot, type1_bytes)   # raises on failure
+lm.verify_single_message_proof(sorted_pks_ssz, message_hash, slot, single_message_proof_bytes)   # raises on failure
 ```
 
-### Type 2 (merge many Type-1s)
+### Multi-message proof (merge many single-message proofs)
 
 ```python
-# Build several Type-1 multi-sigs (one per (message, slot) group), then merge:
-sig_a = lm.aggregate_type_1(pks_a, sigs_a, msg_a, slot, log_inv_rate)
-sig_b = lm.aggregate_type_1(pks_b, sigs_b, msg_b, slot, log_inv_rate)
+# Build several single-message proofs (one per (message, slot) group), then merge:
+sig_a = lm.aggregate_single_message(pks_a, sigs_a, msg_a, slot, log_inv_rate)
+sig_b = lm.aggregate_single_message(pks_b, sigs_b, msg_b, slot, log_inv_rate)
 
-pks_per_component, type2_bytes = lm.merge_many_type_1(
+pks_per_component, multi_message_proof_bytes = lm.merge_many_single_message_proof(
     [sig_a, sig_b], log_inv_rate
 )
 
-lm.verify_type_2(pks_per_component, type2_bytes)
+lm.verify_multi_message_proof(pks_per_component, multi_message_proof_bytes)
 
-# Pull one component back out as an independent Type-1:
-pks_only_a, type1_a = lm.split_type_2(pks_per_component, type2_bytes, 0, log_inv_rate)
+# Pull one component back out as an independent single-message proof:
+pks_only_a, single_message_proof_a = lm.split_multi_message_proof(pks_per_component, multi_message_proof_bytes, 0, log_inv_rate)
 # …or select by message:
-pks_only_a, type1_a = lm.split_type_2_by_msg(
-    pks_per_component, type2_bytes, msg_a, log_inv_rate
+pks_only_a, single_message_proof_a = lm.split_multi_message_proof_by_message(
+    pks_per_component, multi_message_proof_bytes, msg_a, log_inv_rate
 )
 ```
 
 ### Choosing the serialization form
 
-`aggregate_type_1`, `merge_many_type_1`, `split_type_2*` all return the **no-pubkeys**
+`aggregate_single_message`, `merge_many_single_message_proof`, `split_multi_message_proof*` all return the **no-pubkeys**
 form `(pks_ssz, sig_bytes)` — small blob, pubkeys carried separately. To bundle the
 pubkeys into a single self-contained blob (the upstream `compress()` form), use the
 converters:
 
 ```python
-# Type 1
-combined = lm.type1_compress_with_pubkeys(pks_ssz, sig_bytes)         # bundle
-pks_ssz, sig_bytes = lm.type1_decompress_with_pubkeys(combined)       # split
-wire_only = lm.type1_compress_without_pubkeys(combined)               # strip → no-pubkeys form
+# Single-message proof
+combined = lm.single_message_proof_compress_with_pubkeys(pks_ssz, sig_bytes)         # bundle
+pks_ssz, sig_bytes = lm.single_message_proof_decompress_with_pubkeys(combined)       # split
+wire_only = lm.single_message_proof_compress_without_pubkeys(combined)               # strip → no-pubkeys form
 
-# Type 2
-combined = lm.type2_compress_with_pubkeys(pks_per_component, sig_bytes)
-pks_per_component, sig_bytes = lm.type2_decompress_with_pubkeys(combined)
-wire_only = lm.type2_compress_without_pubkeys(combined)
+# Multi-message proof
+combined = lm.multi_message_proof_compress_with_pubkeys(pks_per_component, sig_bytes)
+pks_per_component, sig_bytes = lm.multi_message_proof_decompress_with_pubkeys(combined)
+wire_only = lm.multi_message_proof_compress_without_pubkeys(combined)
 ```
 
 Typical flow if you **store bundled locally but propagate stripped on the wire**:
 
 ```python
 # on disk: keep `bundled` (with pubkeys, single blob)
-wire_bytes = lm.type1_compress_without_pubkeys(bundled)               # outbound
+wire_bytes = lm.single_message_proof_compress_without_pubkeys(bundled)               # outbound
 # … receive `(pks_ssz, wire_bytes)` from a peer …
-bundled    = lm.type1_compress_with_pubkeys(pks_ssz, wire_bytes)      # rehydrate to bundled form
+bundled    = lm.single_message_proof_compress_with_pubkeys(pks_ssz, wire_bytes)      # rehydrate to bundled form
 ```
 
 ### SSZ container codecs
 
-`ssz_encode_type1_signature` / `ssz_decode_type1_signature` wrap a Type-1 blob in
-the `Devnet5Type1Signature` SSZ container. Analogous `*_type2_*` helpers exist
-for Type-2.
+`ssz_encode_single_message_proof` / `ssz_decode_single_message_proof` wrap a single-message proof blob in
+the `Devnet5SingleMessageProof` SSZ container. Analogous `*_multi_message_proof` helpers exist
+for multi-message proofs.
 
 ## API reference
 
@@ -124,25 +124,25 @@ for Type-2.
 |---|---|
 | `setup_prover(mode=)` | Compile aggregation bytecode and precompute DFT twiddles. |
 | `setup_verifier(mode=)` | Compile aggregation bytecode. |
-| `aggregate_type_1(pks, sigs, msg, slot, log_inv_rate, children=None, mode=)` | Returns `(sorted_pks_ssz, type1_bytes)`. |
-| `verify_type_1(pks, msg, slot, sig_bytes, mode=)` | Raises `ValueError` on failure. |
-| `merge_many_type_1(entries, log_inv_rate, mode=)` | `entries = [(pks_ssz, type1_bytes), …]`. Returns `(pks_per_component, type2_bytes)`. |
-| `verify_type_2(pks_per_component, sig_bytes, mode=)` | Raises on failure. |
-| `verify_type_2_with_messages(pks_per_component, expected_messages, sig_bytes, mode=)` | Like `verify_type_2`, but also binds each component to an expected `(message_hash, slot)`. |
-| `split_type_2(pks_per_component, sig_bytes, index, log_inv_rate, mode=)` | Returns `(pks_ssz, type1_bytes)`. |
-| `split_type_2_by_msg(pks_per_component, sig_bytes, message, log_inv_rate, mode=)` | Same, selected by message. |
-| `type1_compress_with_pubkeys(pks_ssz, sig_bytes, mode=)` | Bundle pubkeys into a single Type-1 blob. |
-| `type1_decompress_with_pubkeys(sig_bytes, mode=)` | Split a self-contained Type-1 blob into `(pks_ssz, sig_bytes)`. |
-| `type1_compress_without_pubkeys(sig_bytes, mode=)` | Strip pubkeys from a self-contained Type-1 blob; returns the no-pubkeys wire form. |
-| `type2_compress_with_pubkeys(pks_per_component, sig_bytes, mode=)` | Bundle per-component pubkeys into a single Type-2 blob. |
-| `type2_decompress_with_pubkeys(sig_bytes, mode=)` | Split a self-contained Type-2 blob into `(pks_per_component, sig_bytes)`. |
-| `type2_compress_without_pubkeys(sig_bytes, mode=)` | Strip pubkeys from a self-contained Type-2 blob; returns the no-pubkeys wire form. |
-| `ssz_encode_type1_signature` / `ssz_decode_type1_signature` | Opaque SSZ wrapper for Type-1 blobs. |
-| `ssz_encode_type2_signature` / `ssz_decode_type2_signature` | Opaque SSZ wrapper for Type-2 blobs. |
+| `aggregate_single_message(pks, sigs, msg, slot, log_inv_rate, children=None, mode=)` | Returns `(sorted_pks_ssz, single_message_proof_bytes)`. |
+| `verify_single_message_proof(pks, msg, slot, sig_bytes, mode=)` | Raises `ValueError` on failure. |
+| `merge_many_single_message_proof(entries, log_inv_rate, mode=)` | `entries = [(pks_ssz, single_message_proof_bytes), …]`. Returns `(pks_per_component, multi_message_proof_bytes)`. |
+| `verify_multi_message_proof(pks_per_component, sig_bytes, mode=)` | Raises on failure. |
+| `verify_multi_message_proof_with_messages(pks_per_component, expected_messages, sig_bytes, mode=)` | Like `verify_multi_message_proof`, but also binds each component to an expected `(message_hash, slot)`. |
+| `split_multi_message_proof(pks_per_component, sig_bytes, index, log_inv_rate, mode=)` | Returns `(pks_ssz, single_message_proof_bytes)`. |
+| `split_multi_message_proof_by_message(pks_per_component, sig_bytes, message, log_inv_rate, mode=)` | Same, selected by message. |
+| `single_message_proof_compress_with_pubkeys(pks_ssz, sig_bytes, mode=)` | Bundle pubkeys into a single single-message proof blob. |
+| `single_message_proof_decompress_with_pubkeys(sig_bytes, mode=)` | Split a self-contained single-message proof blob into `(pks_ssz, sig_bytes)`. |
+| `single_message_proof_compress_without_pubkeys(sig_bytes, mode=)` | Strip pubkeys from a self-contained single-message proof blob; returns the no-pubkeys wire form. |
+| `multi_message_proof_compress_with_pubkeys(pks_per_component, sig_bytes, mode=)` | Bundle per-component pubkeys into a single multi-message proof blob. |
+| `multi_message_proof_decompress_with_pubkeys(sig_bytes, mode=)` | Split a self-contained multi-message proof blob into `(pks_per_component, sig_bytes)`. |
+| `multi_message_proof_compress_without_pubkeys(sig_bytes, mode=)` | Strip pubkeys from a self-contained multi-message proof blob; returns the no-pubkeys wire form. |
+| `ssz_encode_single_message_proof` / `ssz_decode_single_message_proof` | Opaque SSZ wrapper for single-message proof blobs. |
+| `ssz_encode_multi_message_proof` / `ssz_decode_multi_message_proof` | Opaque SSZ wrapper for multi-message proof blobs. |
 
 ## Notes
 
 - `setup_prover` is expensive (~seconds). Call it once at process start.
 - All `pub_keys_bytes` / `signatures_bytes` must be SSZ-encoded (see `leansig_wrapper`'s `xmss_public_key_to_ssz` / `xmss_signature_to_ssz`).
-- The number of public keys must match the number of signatures in `aggregate_type_1`.
+- The number of public keys must match the number of signatures in `aggregate_single_message`.
 - Mode selection: with no `mode=` argument the wrappers prefer the prod module if both are present.
