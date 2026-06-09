@@ -4,8 +4,10 @@ use leansig_wrapper::{
     XmssSignature, MESSAGE_LENGTH,
 };
 use rec_aggregation::{
-    aggregate_type_1, init_aggregation_bytecode, merge_many_type_1, split_type_2,
-    split_type_2_by_msg, verify_type_1, verify_type_2, TypeOneMultiSignature, TypeTwoMultiSignature,
+    aggregate_single_message_signatures, init_aggregation_bytecode, merge_single_message_aggregates,
+    split_multi_message_aggregate, split_multi_message_aggregate_by_message,
+    verify_multi_message_aggregate, verify_single_message_aggregate, MultiMessageAggregateSignature,
+    SingleMessageAggregateSignature,
 };
 
 use pyo3::exceptions::PyValueError;
@@ -19,7 +21,7 @@ pub const MODE: &str = "test";
 pub const MODE: &str = "prod";
 
 /// Opaque SSZ container wrapping the compressed bytes of a single-message proof
-/// (postcard + lz4, produced by `TypeOneMultiSignature::compress_without_pubkeys`).
+/// (postcard + lz4, produced by `SingleMessageAggregateSignature::compress_without_pubkeys`).
 #[derive(Debug, Clone)]
 pub struct Devnet5SingleMessageProof {
     pub proof_bytes: Vec<u8>,
@@ -50,7 +52,7 @@ impl Decode for Devnet5SingleMessageProof {
 }
 
 /// Opaque SSZ container wrapping the compressed bytes of a multi-message proof
-/// (postcard + lz4, produced by `TypeTwoMultiSignature::compress_without_pubkeys`).
+/// (postcard + lz4, produced by `MultiMessageAggregateSignature::compress_without_pubkeys`).
 #[derive(Debug, Clone)]
 pub struct Devnet5MultiMessageProof {
     pub proof_bytes: Vec<u8>,
@@ -183,13 +185,13 @@ fn py_aggregate_single_message(
     let raw_xmss: Vec<(XmssPublicKey, XmssSignature)> =
         pub_keys.into_iter().zip(signatures).collect();
 
-    let children: Vec<TypeOneMultiSignature> = match children_bytes {
+    let children: Vec<SingleMessageAggregateSignature> = match children_bytes {
         Some(cb) => cb
             .into_iter()
             .enumerate()
             .map(|(i, (child_pks_bytes, child_bytes))| {
                 let child_pks = deserialize_pub_keys(&child_pks_bytes, &format!("child {i}"))?;
-                TypeOneMultiSignature::decompress_without_pubkeys(&child_bytes, child_pks).ok_or_else(
+                SingleMessageAggregateSignature::decompress_without_pubkeys(&child_bytes, child_pks).ok_or_else(
                     || PyValueError::new_err(format!("Failed to decompress child {i} (single-message aggregate)")),
                 )
             })
@@ -198,7 +200,7 @@ fn py_aggregate_single_message(
     };
 
     let agg = catch_panic(
-        || aggregate_type_1(&children, raw_xmss, message_array, slot, log_inv_rate),
+        || aggregate_single_message_signatures(&children, raw_xmss, message_array, slot, log_inv_rate),
         "single-message aggregation",
     )?
     .map_err(|e| PyValueError::new_err(format!("single-message aggregation failed: {e:?}")))?;
@@ -226,7 +228,7 @@ fn py_verify_single_message_proof(
 ) -> PyResult<()> {
     let message_array = message_to_array(message_hash)?;
     let pub_keys = deserialize_pub_keys(&pub_keys_bytes, "single-message")?;
-    let sig = TypeOneMultiSignature::decompress_without_pubkeys(&sig_bytes, pub_keys)
+    let sig = SingleMessageAggregateSignature::decompress_without_pubkeys(&sig_bytes, pub_keys)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress single-message proof"))?;
 
     if sig.info.without_pubkeys.message != message_array {
@@ -236,7 +238,8 @@ fn py_verify_single_message_proof(
         return Err(PyValueError::new_err("slot does not match signature"));
     }
 
-    verify_type_1(&sig).map_err(|e| PyValueError::new_err(format!("Verification failed: {e:?}")))?;
+    verify_single_message_aggregate(&sig)
+        .map_err(|e| PyValueError::new_err(format!("Verification failed: {e:?}")))?;
     Ok(())
 }
 
@@ -260,19 +263,19 @@ fn py_merge_many_single_message_proof(
         return Err(PyValueError::new_err("merge_many_single_message_proof requires at least one entry"));
     }
 
-    let single_message_proofs: Vec<TypeOneMultiSignature> = single_message_proof_entries
+    let single_message_proofs: Vec<SingleMessageAggregateSignature> = single_message_proof_entries
         .into_iter()
         .enumerate()
         .map(|(i, (pks_bytes, sig_bytes))| {
             let pks = deserialize_pub_keys(&pks_bytes, &format!("component {i}"))?;
-            TypeOneMultiSignature::decompress_without_pubkeys(&sig_bytes, pks).ok_or_else(|| {
+            SingleMessageAggregateSignature::decompress_without_pubkeys(&sig_bytes, pks).ok_or_else(|| {
                 PyValueError::new_err(format!("Failed to decompress single-message component {i}"))
             })
         })
         .collect::<PyResult<_>>()?;
 
     let multi_message_proof = catch_panic(
-        || merge_many_type_1(single_message_proofs, log_inv_rate),
+        || merge_single_message_aggregates(single_message_proofs, log_inv_rate),
         "merge_many_single_message_proof",
     )?
     .map_err(|e| PyValueError::new_err(format!("merge_many_single_message_proof failed: {e:?}")))?;
@@ -298,10 +301,11 @@ fn py_verify_multi_message_proof(
         .map(|(i, pks_bytes)| deserialize_pub_keys(pks_bytes, &format!("component {i}")))
         .collect::<PyResult<_>>()?;
 
-    let sig = TypeTwoMultiSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
+    let sig = MultiMessageAggregateSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress multi-message proof"))?;
 
-    verify_type_2(&sig).map_err(|e| PyValueError::new_err(format!("Verification failed: {e:?}")))?;
+    verify_multi_message_aggregate(&sig)
+        .map_err(|e| PyValueError::new_err(format!("Verification failed: {e:?}")))?;
     Ok(())
 }
 
@@ -346,7 +350,7 @@ fn py_verify_multi_message_proof_with_messages(
         .map(|(i, pks_bytes)| deserialize_pub_keys(pks_bytes, &format!("component {i}")))
         .collect::<PyResult<_>>()?;
 
-    let sig = TypeTwoMultiSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
+    let sig = MultiMessageAggregateSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress multi-message proof"))?;
 
     if sig.info.len() != expected.len() {
@@ -371,7 +375,8 @@ fn py_verify_multi_message_proof_with_messages(
         }
     }
 
-    verify_type_2(&sig).map_err(|e| PyValueError::new_err(format!("Verification failed: {e:?}")))?;
+    verify_multi_message_aggregate(&sig)
+        .map_err(|e| PyValueError::new_err(format!("Verification failed: {e:?}")))?;
     Ok(())
 }
 
@@ -398,11 +403,11 @@ fn py_split_multi_message_proof(
         .map(|(i, pks_bytes)| deserialize_pub_keys(pks_bytes, &format!("component {i}")))
         .collect::<PyResult<_>>()?;
 
-    let multi_message_proof = TypeTwoMultiSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
+    let multi_message_proof = MultiMessageAggregateSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress multi-message proof"))?;
 
     let single_message_proof = catch_panic(
-        || split_type_2(multi_message_proof, index, log_inv_rate),
+        || split_multi_message_aggregate(multi_message_proof, index, log_inv_rate),
         "split_multi_message_proof",
     )?
     .map_err(|e| PyValueError::new_err(format!("split_multi_message_proof failed: {e:?}")))?;
@@ -435,11 +440,11 @@ fn py_split_multi_message_proof_by_message(
         .map(|(i, pks_bytes)| deserialize_pub_keys(pks_bytes, &format!("component {i}")))
         .collect::<PyResult<_>>()?;
 
-    let multi_message_proof = TypeTwoMultiSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
+    let multi_message_proof = MultiMessageAggregateSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress multi-message proof"))?;
 
     let single_message_proof = catch_panic(
-        || split_type_2_by_msg(multi_message_proof, message_array, log_inv_rate),
+        || split_multi_message_aggregate_by_message(multi_message_proof, message_array, log_inv_rate),
         "split_multi_message_proof_by_message",
     )?
     .map_err(|e| PyValueError::new_err(format!("split_multi_message_proof_by_message failed: {e:?}")))?;
@@ -456,14 +461,14 @@ fn py_split_multi_message_proof_by_message(
 ///         by `aggregate_single_message` and `split_multi_message_proof`).
 ///
 /// Returns:
-///     A self-contained single-message proof blob (`TypeOneMultiSignature::compress()` form).
+///     A self-contained single-message proof blob (`SingleMessageAggregateSignature::compress()` form).
 #[pyfunction]
 fn single_message_proof_compress_with_pubkeys(
     pub_keys_bytes: Vec<Vec<u8>>,
     sig_bytes: Vec<u8>,
 ) -> PyResult<Vec<u8>> {
     let pks = deserialize_pub_keys(&pub_keys_bytes, "single-message")?;
-    let sig = TypeOneMultiSignature::decompress_without_pubkeys(&sig_bytes, pks)
+    let sig = SingleMessageAggregateSignature::decompress_without_pubkeys(&sig_bytes, pks)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress single-message proof"))?;
     Ok(sig.compress())
 }
@@ -477,7 +482,7 @@ fn single_message_proof_compress_with_pubkeys(
 ///     `(pks_ssz, single_message_proof_no_pubkeys_bytes)` — the same shape `aggregate_single_message` returns.
 #[pyfunction]
 fn single_message_proof_decompress_with_pubkeys(sig_bytes: Vec<u8>) -> PyResult<(Vec<Vec<u8>>, Vec<u8>)> {
-    let sig = TypeOneMultiSignature::decompress(&sig_bytes)
+    let sig = SingleMessageAggregateSignature::decompress(&sig_bytes)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress single-message proof"))?;
     let pks_ssz = pks_to_ssz(&sig.info.pubkeys);
     Ok((pks_ssz, sig.compress_without_pubkeys()))
@@ -496,7 +501,7 @@ fn single_message_proof_decompress_with_pubkeys(sig_bytes: Vec<u8>) -> PyResult<
 ///     `no_pubkeys_bytes` — the form returned by `aggregate_single_message`'s second element.
 #[pyfunction]
 fn single_message_proof_compress_without_pubkeys(sig_bytes: Vec<u8>) -> PyResult<Vec<u8>> {
-    let sig = TypeOneMultiSignature::decompress(&sig_bytes)
+    let sig = SingleMessageAggregateSignature::decompress(&sig_bytes)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress single-message proof"))?;
     Ok(sig.compress_without_pubkeys())
 }
@@ -512,7 +517,7 @@ fn multi_message_proof_compress_with_pubkeys(
         .enumerate()
         .map(|(i, pks_bytes)| deserialize_pub_keys(pks_bytes, &format!("component {i}")))
         .collect::<PyResult<_>>()?;
-    let sig = TypeTwoMultiSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
+    let sig = MultiMessageAggregateSignature::decompress_without_pubkeys(&sig_bytes, pks_per_component)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress multi-message proof"))?;
     Ok(sig.compress())
 }
@@ -520,7 +525,7 @@ fn multi_message_proof_compress_with_pubkeys(
 /// Split a self-contained multi-message proof blob back into (pubkeys_per_component_ssz, no-pubkeys-blob).
 #[pyfunction]
 fn multi_message_proof_decompress_with_pubkeys(sig_bytes: Vec<u8>) -> PyResult<(Vec<Vec<Vec<u8>>>, Vec<u8>)> {
-    let sig = TypeTwoMultiSignature::decompress(&sig_bytes)
+    let sig = MultiMessageAggregateSignature::decompress(&sig_bytes)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress multi-message proof"))?;
     let pks_per_component: Vec<Vec<Vec<u8>>> =
         sig.info.iter().map(|info| pks_to_ssz(&info.pubkeys)).collect();
@@ -531,7 +536,7 @@ fn multi_message_proof_decompress_with_pubkeys(sig_bytes: Vec<u8>) -> PyResult<(
 /// compact wire form.
 #[pyfunction]
 fn multi_message_proof_compress_without_pubkeys(sig_bytes: Vec<u8>) -> PyResult<Vec<u8>> {
-    let sig = TypeTwoMultiSignature::decompress(&sig_bytes)
+    let sig = MultiMessageAggregateSignature::decompress(&sig_bytes)
         .ok_or_else(|| PyValueError::new_err("Failed to decompress multi-message proof"))?;
     Ok(sig.compress_without_pubkeys())
 }
